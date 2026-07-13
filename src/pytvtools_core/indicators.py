@@ -6,7 +6,7 @@ or a list of OHLCV bar dicts with at least a ``"close"`` key.
 Multi-column indicators (MACD, BBands, SRSI, SuperTrend, DSS)
 require dict bars and return ``dict[str, list]``.
 
-Volume-based indicators (MFI, etc.) require dict bars with
+Volume-based indicators (MFI, PVP, etc.) require dict bars with
 ``"high"``, ``"low"``, ``"close"``, ``"volume"`` and raise
 ``ValueError`` if given flat floats.
 
@@ -21,18 +21,22 @@ Usage::
 
 from __future__ import annotations
 
+from datetime import datetime, timezone, timedelta
+
+import math
 from typing import Any
+from pytvtools_core.types import OHLCVBar
 
 
-def _prices(data: list[float] | list[dict[str, Any]]) -> list[float]:
+def _prices(data: list[float] | list[OHLCVBar]) -> list[float]:
     if not data:
         return []
     if isinstance(data[0], dict):
-        return [d["close"] for d in data]  # type: ignore[arg-type]
+        return [d["close"] for d in data]  # type: ignore[misc]
     return [float(d) for d in data]  # type: ignore[misc]
 
 
-def sma(data: list[float] | list[dict[str, Any]], period: int = 20) -> list[float | None]:
+def sma(data: list[float] | list[OHLCVBar], period: int = 20) -> list[float | None]:
     """Simple Moving Average.
 
     Returns a list the same length as *data*; the first ``period - 1``
@@ -47,7 +51,7 @@ def sma(data: list[float] | list[dict[str, Any]], period: int = 20) -> list[floa
     return result
 
 
-def ema(data: list[float] | list[dict[str, Any]], period: int = 20) -> list[float | None]:
+def ema(data: list[float] | list[OHLCVBar], period: int = 20) -> list[float | None]:
     """Exponential Moving Average.
 
     Uses ``alpha = 2 / (period + 1)`` with SMA seed.
@@ -67,7 +71,7 @@ def ema(data: list[float] | list[dict[str, Any]], period: int = 20) -> list[floa
     return result
 
 
-def rsi(data: list[float] | list[dict[str, Any]], period: int = 14) -> list[float | None]:
+def rsi(data: list[float] | list[OHLCVBar], period: int = 14) -> list[float | None]:
     """Relative Strength Index (Wilder's smoothing).
 
     Uses ``alpha = 1 / period`` for average gain/loss.
@@ -109,7 +113,7 @@ def rsi(data: list[float] | list[dict[str, Any]], period: int = 14) -> list[floa
     return result
 
 
-def mfi(data: list[float] | list[dict[str, Any]], period: int = 14) -> list[float | None]:
+def mfi(data: list[float] | list[OHLCVBar], period: int = 14) -> list[float | None]:
     """Money Flow Index (SMA-based rolling sum).
 
     Requires OHLCV bar dicts with ``"high"``, ``"low"``, ``"close"``, ``"volume"`` keys.
@@ -121,10 +125,10 @@ def mfi(data: list[float] | list[dict[str, Any]], period: int = 14) -> list[floa
         return []
 
     if isinstance(data[0], dict):
-        highs = [float(d["high"]) for d in data]
-        lows = [float(d["low"]) for d in data]
-        closes = [float(d["close"]) for d in data]
-        volumes = [float(d["volume"]) for d in data]
+        highs = [float(d["high"]) for d in data]  # type: ignore[misc]
+        lows = [float(d["low"]) for d in data]  # type: ignore[misc]
+        closes = [float(d["close"]) for d in data]  # type: ignore[misc]
+        volumes = [float(d["volume"]) for d in data]  # type: ignore[misc]
     else:
         raise ValueError(
             "mfi() requires OHLCV bar dicts with 'high', 'low', 'close', "
@@ -193,7 +197,7 @@ def _auto_tick_size(prices: list[float]) -> float:
 
 
 def macd(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     fast: int = 12,
     slow: int = 26,
     signal: int = 9,
@@ -231,7 +235,7 @@ def macd(
 
 
 def bbands(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     period: int = 20,
     stddev: float = 2.0,
 ) -> dict[str, list[float | None]]:
@@ -260,7 +264,7 @@ def bbands(
 
 
 def srsi(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     period: int = 14,
     smooth_k: int = 3,
     smooth_d: int = 3,
@@ -310,7 +314,7 @@ def sma_series(values: list[float | None], period: int) -> list[float | None]:
 
 
 def supertrend(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     period: int = 10,
     multiplier: float = 3.0,
 ) -> dict[str, list[float | None]]:
@@ -328,9 +332,9 @@ def supertrend(
     if not isinstance(data[0], dict):
         raise ValueError("SuperTrend requires OHLCV dict bars")
 
-    highs = [float(d["high"]) for d in data]
-    lows = [float(d["low"]) for d in data]
-    closes = [float(d["close"]) for d in data]
+    highs = [float(d["high"]) for d in data]  # type: ignore[misc]
+    lows = [float(d["low"]) for d in data]  # type: ignore[misc]
+    closes = [float(d["close"]) for d in data]  # type: ignore[misc]
 
     n = len(data)
     up_trend: list[float | None] = [None] * n
@@ -415,7 +419,7 @@ def ema_series(values: list[float | None], period: int) -> list[float | None]:
 
 
 def dss(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     pds: int = 10,
     ema_len: int = 9,
     trigger_len: int = 5,
@@ -452,13 +456,13 @@ def dss(
     # Extract OHLCV — if bars have a 'resampled_close' key use that,
     # otherwise read the standard fields (daily OHLCV).
     if "resampled_close" in data[0]:
-        closes = [float(d["resampled_close"]) for d in data]
-        highs = [float(d["resampled_high"]) for d in data]
-        lows = [float(d["resampled_low"]) for d in data]
+        closes = [float(d["resampled_close"]) for d in data]  # type: ignore[misc]
+        highs = [float(d["resampled_high"]) for d in data]  # type: ignore[misc]
+        lows = [float(d["resampled_low"]) for d in data]  # type: ignore[misc]
     else:
-        closes = [float(d["close"]) for d in data]
-        highs = [float(d["high"]) for d in data]
-        lows = [float(d["low"]) for d in data]
+        closes = [float(d["close"]) for d in data]  # type: ignore[misc]
+        highs = [float(d["high"]) for d in data]  # type: ignore[misc]
+        lows = [float(d["low"]) for d in data]  # type: ignore[misc]
 
     # Step 1: stoch(close, high, low, pds)
     stoch1: list[float | None] = [None] * n
@@ -501,7 +505,7 @@ def dss(
 
 
 def market_cipher_b(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     channel_length: int = 10,
     average_length: int = 21,
 ) -> dict[str, list[float | None]]:
@@ -520,9 +524,9 @@ def market_cipher_b(
     if not isinstance(data[0], dict):
         raise ValueError("market_cipher_b requires OHLCV dict bars")
 
-    highs = [float(d["high"]) for d in data]
-    lows = [float(d["low"]) for d in data]
-    closes = [float(d["close"]) for d in data]
+    highs = [float(d["high"]) for d in data]  # type: ignore[misc]
+    lows = [float(d["low"]) for d in data]  # type: ignore[misc]
+    closes = [float(d["close"]) for d in data]  # type: ignore[misc]
     n = len(data)
 
     ap = [(highs[i] + lows[i] + closes[i]) / 3.0 for i in range(n)]
@@ -553,7 +557,7 @@ def market_cipher_b(
 
 
 def atr(
-    data: list[float] | list[dict[str, Any]],
+    data: list[float] | list[OHLCVBar],
     period: int = 14,
 ) -> list[float | None]:
     """Average True Range (ATR) with Wilder's smoothing (RMA).
@@ -589,3 +593,202 @@ def atr(
             result[i] = rma
 
     return result
+
+
+_STANDARD_TICKS = [1.0, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001]
+
+
+def _infer_mintick(data: list[OHLCVBar], max_samples: int = 200) -> float:
+    """Infer minimum tick size from price data.
+
+    Looks at prices in the first *max_samples* bars and finds the
+    smallest non-zero difference between adjacent price levels.
+    The result is rounded to the nearest standard tick size to
+    eliminate sub-tick noise in bar data.
+    """
+    prices: set[float] = set()
+    for b in data[:max_samples]:
+        prices.add(round(float(b["high"]), 10))
+        prices.add(round(float(b["low"]), 10))
+    sorted_prices = sorted(prices)
+    if len(sorted_prices) < 2:
+        return 0.01
+    diffs = [
+        round(sorted_prices[i + 1] - sorted_prices[i], 10)
+        for i in range(len(sorted_prices) - 1)
+        if round(sorted_prices[i + 1] - sorted_prices[i], 10) > 1e-10
+    ]
+    if not diffs:
+        return 0.01
+    min_diff = min(diffs)
+    return min(_STANDARD_TICKS, key=lambda t: abs(t - min_diff))
+
+
+def pvp(
+    data: list[float] | list[OHLCVBar],
+    period_mult: int = 1,
+    period_unit: str = "Day",
+    num_rows: int = 24,
+    mintick: float | None = None,
+    utc_offset: float | None = None,
+) -> list[float | None]:
+    """Periodic Volume Profile — POC at period boundaries.
+
+    Replicates the exact tick-based row-sizing algorithm from
+    ``pvp.pine``'s ``f_poc()`` function.
+
+    Parameters
+    ----------
+    data : list[dict]
+        OHLCV bars with ``'high'``, ``'low'``, ``'volume'``, ``'timestamp'``.
+    period_mult : int
+        Period multiplier (1, 2, …).
+    period_unit : str
+        ``"Day"`` (default), ``"Week"``, or ``"Month"``.
+    num_rows : int
+        Target number of rows for the volume histogram (default 24).
+    mintick : float, optional
+        Minimum price tick.  Auto-inferred from data if omitted.
+    utc_offset : float, optional
+        Hours from UTC (e.g. -5 for US Eastern Standard Time).
+        Shifts period boundaries to match the exchange timezone.
+        ``None`` (default) uses UTC midnight boundaries.
+
+    Returns
+    -------
+    ``list[float | None]`` aligned to the input length.  Values are
+    ``None`` for bars that are not the last bar of a period.
+    """
+    if not data:
+        return []
+
+    if not isinstance(data[0], dict):
+        raise ValueError(
+            "pvp() requires OHLCV bar dicts with 'high', 'low', 'volume', "
+            "'timestamp' keys."
+        )
+
+    n = len(data)
+
+    if mintick is None:
+        mintick = _infer_mintick(data)  # type: ignore[arg-type]
+    if mintick <= 0:
+        mintick = 0.01
+
+    exchange_midnight_offset = int((-utc_offset) * 3600) if utc_offset is not None else 0
+
+    first_ts = int(data[0]["timestamp"])  # type: ignore[arg-type]
+    ts_div = 1000 if first_ts > 1e11 else 1
+
+    def _period_key(ts_seconds: int) -> tuple[int, int]:
+        shifted_ts = ts_seconds - exchange_midnight_offset
+        dt = datetime.fromtimestamp(shifted_ts, tz=timezone.utc)
+        if period_unit == "Day":
+            base = (shifted_ts // 86400) * 86400
+        elif period_unit == "Week":
+            days_since_monday = dt.weekday()
+            week_start = dt - timedelta(days=days_since_monday)
+            week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            base = int(week_start.timestamp())
+        elif period_unit == "Month":
+            month_start = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            base = int(month_start.timestamp())
+        else:
+            base = (shifted_ts // 86400) * 86400
+        if period_mult > 1:
+            periods_since_epoch = base // 86400
+            period_remainder = periods_since_epoch % period_mult
+            base -= period_remainder * 86400
+        period_key = base + exchange_midnight_offset
+        # Year alignment: profiles start fresh at each calendar year boundary,
+        # matching Pine's `year_change = ta.change(time("12M"))` logic.
+        year_start = dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        year_key = int(year_start.timestamp()) + exchange_midnight_offset
+        return (year_key, period_key)
+
+    period_groups: dict[tuple[int, int], list[int]] = {}
+    for i in range(n):
+        ts = int(data[i]["timestamp"]) // ts_div  # type: ignore[arg-type]
+        pk = _period_key(ts)
+        if pk not in period_groups:
+            period_groups[pk] = []
+        period_groups[pk].append(i)
+
+    result: list[float | None] = [None] * n
+
+    for indices in period_groups.values():
+        if not indices:
+            continue
+
+        period_bars = [data[i] for i in indices]  # type: ignore[arg-type]
+
+        poc_price = _compute_period_poc(
+            [float(b["high"]) for b in period_bars],  # type: ignore[arg-type]
+            [float(b["low"]) for b in period_bars],
+            [float(b.get("volume", 0) or 0) for b in period_bars],
+            num_rows=num_rows,
+            mintick=mintick,
+        )
+        if poc_price is not None:
+            result[indices[-1]] = poc_price
+
+    return result
+
+
+def _compute_period_poc(
+    highs: list[float],
+    lows: list[float],
+    volumes: list[float],
+    num_rows: int,
+    mintick: float,
+) -> float | None:
+    """Compute POC for a single period's bars.
+
+    Replicates ``pvp.pine``'s ``f_poc()`` algorithm exactly.
+    """
+    min_p = min(lows)
+    max_p = max(highs)
+    pr = max_p - min_p
+
+    if pr <= 0 or mintick <= 0:
+        return None
+
+    ticks = pr / mintick
+
+    tpr_down = int(math.floor(ticks / num_rows))
+    tpr_down = max(tpr_down, 1)
+    tpr_up = int(math.ceil(ticks / num_rows))
+    tpr_up = max(tpr_up, 1)
+
+    rows_down = int(math.ceil(ticks / tpr_down))
+    rows_up = int(math.ceil(ticks / tpr_up))
+
+    tpr_used = tpr_down if abs(rows_down - num_rows) <= abs(rows_up - num_rows) else tpr_up
+    total_rows = int(math.ceil(ticks / tpr_used))
+    row_height = tpr_used * mintick
+
+    row_volumes = [0.0] * total_rows
+
+    for i in range(len(lows)):
+        bv = volumes[i]
+        if bv <= 0:
+            continue
+        bh = highs[i]
+        bl = lows[i]
+        tr = (bh - bl) / mintick
+        nt = max(int(tr), 1)
+        n_levels = nt + 1
+        vpt = bv / n_levels
+
+        for t in range(nt + 1):
+            price = bl + t * mintick
+            r = int((price - min_p) / row_height)
+            r = max(0, min(total_rows - 1, r))
+            row_volumes[r] += vpt
+
+    max_vol = max(row_volumes)
+    if max_vol <= 0:
+        return None
+
+    poc_row = row_volumes.index(max_vol)
+    return min_p + (poc_row + 0.5) * row_height
