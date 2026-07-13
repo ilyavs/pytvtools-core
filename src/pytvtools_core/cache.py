@@ -34,6 +34,8 @@ if TYPE_CHECKING:
     from pytvtools_core.types import OHLCVBar
 from urllib.parse import quote, unquote
 
+import websockets
+
 try:
     from pytvtools_core.tvdata import TVData
 except ImportError:
@@ -283,8 +285,15 @@ class MarketDataCache:
 
     @staticmethod
     async def _fetch_all(symbol: str, timeframe: str, chunk_size: int) -> list[OHLCVBar]:
-        async with TVData() as tv:
-            return await tv.get_ohlcv_all(symbol, timeframe, chunk_size)
+        for attempt in range(3):
+            try:
+                async with TVData() as tv:
+                    return await tv.get_ohlcv_all(symbol, timeframe, chunk_size)
+            except websockets.ConnectionClosed:
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+        return []
 
     # ------------------------------------------------------------------
     #  Latest timestamp
