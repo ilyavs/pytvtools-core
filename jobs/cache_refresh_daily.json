@@ -1,0 +1,43 @@
+{
+  "created_time": 1783764782074,
+  "creator_user_name": "sl.ilya1987@gmail.com",
+  "job_id": 795017445883903,
+  "run_as_user_name": "sl.ilya1987@gmail.com",
+  "settings": {
+    "email_notifications": {},
+    "format": "MULTI_TASK",
+    "git_source": {
+      "git_branch": "master",
+      "git_provider": "github",
+      "git_url": "https://github.com/ilyavs/pytvtools-core-public"
+    },
+    "max_concurrent_runs": 1,
+    "name": "cache_refresh_daily",
+    "queue": {
+      "enabled": true
+    },
+    "schedule": {
+      "pause_status": "PAUSED",
+      "quartz_cron_expression": "0 30 21 ? * MON-FRI *",
+      "timezone_id": "America/New_York"
+    },
+    "tasks": [
+      {
+        "disabled": false,
+        "email_notifications": {},
+        "notebook_task": {
+          "base_parameters": {
+            "timeframe": "1D"
+          },
+          "notebook_path": "notebooks/cache_refresh",
+          "source": "GIT"
+        },
+        "run_if": "ALL_SUCCESS",
+        "task_key": "refresh_1d",
+        "timeout_seconds": 3600
+      }
+    ],
+    "timeout_seconds": 0,
+    "webhook_notifications": {}
+  }
+}

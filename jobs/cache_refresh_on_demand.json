@@ -1,0 +1,37 @@
+{
+  "created_time": 1783765943616,
+  "creator_user_name": "sl.ilya1987@gmail.com",
+  "job_id": 646435410260973,
+  "run_as_user_name": "sl.ilya1987@gmail.com",
+  "settings": {
+    "email_notifications": {},
+    "format": "MULTI_TASK",
+    "max_concurrent_runs": 5,
+    "name": "cache_refresh_on_demand",
+    "queue": {
+      "enabled": true
+    },
+    "tasks": [
+      {
+        "disabled": false,
+        "email_notifications": {},
+        "max_retries": 3,
+        "min_retry_interval_millis": 30000,
+        "notebook_task": {
+          "base_parameters": {
+            "symbol": "",
+            "timeframe": "1M"
+          },
+          "notebook_path": "/Users/sl.ilya1987@gmail.com/pytvtools-core/notebooks/cache_refresh",
+          "source": "WORKSPACE"
+        },
+        "retry_on_timeout": false,
+        "run_if": "ALL_SUCCESS",
+        "task_key": "refresh_single",
+        "timeout_seconds": 3600
+      }
+    ],
+    "timeout_seconds": 0,
+    "webhook_notifications": {}
+  }
+}
