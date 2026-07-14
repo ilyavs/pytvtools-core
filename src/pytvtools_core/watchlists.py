@@ -216,3 +216,179 @@ CRYPTO = Watchlist(
         "BITSTAMP:ETHUSD",
     ),
 )
+
+# ---------------------------------------------------------------------------
+# Metals & Miners
+# ---------------------------------------------------------------------------
+
+METALS_MINERS = Watchlist(
+    name="Metals & Miners",
+    symbols=(
+        # Precious spot
+        "OANDA:XAUUSD", "TVC:GOLD", "OANDA:XAGUSD", "TVC:SILVER",
+        "OANDA:XPTUSD", "TVC:PLATINUM", "OANDA:XPDUSD", "TVC:PALLADIUM",
+        "OANDA:XCUUSD", "CAPITALCOM:COPPER",
+        # Gold miners ETF
+        "AMEX:GDX", "AMEX:GDXJ",
+        # Silver miners ETF
+        "AMEX:SIL", "AMEX:SILJ",
+        # Gold ETFs
+        "AMEX:GLD", "AMEX:IAU",
+        # Platinum/Palladium
+        "AMEX:PPLT", "AMEX:PALL", "AMEX:PLG",
+        # Copper
+        "AMEX:COPX", "AMEX:CPER", "LSE:COPA",
+        # Individual miners
+        "NEM", "FCX", "SCCO", "AA", "RIO", "BHP", "HBM", "TECK", "VALE",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Index Futures
+# ---------------------------------------------------------------------------
+
+INDEX_FUTURES = Watchlist(
+    name="Index Futures",
+    symbols=(
+        "CME_MINI:ES1!",
+        "CME_MINI:NQ1!",
+        "CBOT_MINI:YM1!",
+        "CME_MINI:RTY1!",
+        "EUREX:FDAX1!",
+        "EUREX:FESX1!",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Index CFDs
+# ---------------------------------------------------------------------------
+
+INDEX_CFDS = Watchlist(
+    name="Index CFDs",
+    symbols=(
+        "SPCFD:SPX",
+        "TVC:NDQ",
+        "TVC:DJI",
+        "TVC:RUT",
+        "TVC:DAX",
+        "TVC:UKX",
+        "EURONEXT:PX1",
+        "TVC:NI225",
+        "TVC:HSI",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Index ETFs
+# ---------------------------------------------------------------------------
+
+INDEX_ETFS = Watchlist(
+    name="Index ETFs",
+    symbols=(
+        "AMEX:SPY",
+        "NASDAQ:QQQ",
+        "AMEX:IWM",
+        "AMEX:DIA",
+        "AMEX:VTI",
+        "CBOE:MAGS",
+        "NASDAQ:TLT",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Bonds
+# ---------------------------------------------------------------------------
+
+BONDS = Watchlist(
+    name="Bonds",
+    symbols=(
+        "TVC:US10Y",
+        "TVC:US02Y",
+        "TVC:US03M",
+        "TVC:TNX",
+        "CBOT:TN1!",
+        "CBOT:ZT1!",
+        "NASDAQ:TLT",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Oil
+# ---------------------------------------------------------------------------
+
+OIL = Watchlist(
+    name="Oil",
+    symbols=(
+        "TVC:USOIL",
+        "TVC:UKOIL",
+        "NYMEX:CL1!",
+        "OANDA:WTICOUSD",
+        "OANDA:BCOUSD",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Uranium & Strategic Commodities
+# ---------------------------------------------------------------------------
+
+URANIUM_STRATEGIC = Watchlist(
+    name="Uranium & Strategic Commodities",
+    symbols=(
+        "AMEX:URA",
+        "AMEX:URNM",
+        "AMEX:UEC",
+        "NASDAQ:NNE",
+        "NASDAQ:USAR",
+        "NASDAQ:AREC",
+        "NASDAQ:CRML",
+        "NYSE:AMR",
+        "CCJ",
+        "DNN",
+        "NXE",
+        "GLO",
+        "EU",
+        "URG",
+        "AMEX:REMX",
+        "NYSE:MP",
+        "NASDAQ:NB",
+        "NASDAQ:NIKL",
+        "LYC",
+        "AMEX:SLX",
+        "OTC:AMLIF",
+        "NASDAQ:CENX",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Registry — map name → Watchlist for job lookup
+# ---------------------------------------------------------------------------
+
+WATCHLISTS: dict[str, Watchlist] = {
+    "SPDR_SECTORS": SPDR_SECTORS,
+    "SPDR_INDUSTRIES": SPDR_INDUSTRIES,
+    "SPDR_ALL": SPDR_ALL,
+    "CRYPTO": CRYPTO,
+    "METALS_MINERS": METALS_MINERS,
+    "INDEX_FUTURES": INDEX_FUTURES,
+    "INDEX_CFDS": INDEX_CFDS,
+    "INDEX_ETFS": INDEX_ETFS,
+    "BONDS": BONDS,
+    "OIL": OIL,
+    "URANIUM_STRATEGIC": URANIUM_STRATEGIC,
+}
+
+PINK_LIST_WATCHLISTS: dict[str, Watchlist] = {
+    "METALS_MINERS": METALS_MINERS,
+    "INDEX_FUTURES": INDEX_FUTURES,
+    "INDEX_CFDS": INDEX_CFDS,
+    "INDEX_ETFS": INDEX_ETFS,
+    "BONDS": BONDS,
+    "OIL": OIL,
+    "URANIUM_STRATEGIC": URANIUM_STRATEGIC,
+}
+
+def get_watchlist(name: str) -> Watchlist:
+    """Look up a watchlist by name constant."""
+    if name not in WATCHLISTS:
+        raise KeyError(f"Unknown watchlist: {name}. Choices: {', '.join(sorted(WATCHLISTS))}")
+    return WATCHLISTS[name]
