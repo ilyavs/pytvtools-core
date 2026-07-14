@@ -369,11 +369,21 @@ class TVData:
         }))
 
         deadline = asyncio.get_running_loop().time() + _TIMEOUT * 3
+        consecutive_timeouts = 0
+        max_consecutive_timeouts = 3
         while asyncio.get_running_loop().time() < deadline:
             try:
                 raw = await asyncio.wait_for(self._ws.recv(), timeout=10)
+                consecutive_timeouts = 0
             except asyncio.TimeoutError:
-                break
+                consecutive_timeouts += 1
+                if consecutive_timeouts >= max_consecutive_timeouts:
+                    raise asyncio.TimeoutError(
+                        f"Connection stalled for {symbol} ({interval}): "
+                        f"{consecutive_timeouts} consecutive timeouts"
+                    )
+                await asyncio.sleep(2 ** consecutive_timeouts)
+                continue
             if isinstance(raw, bytes):
                 raw = raw.decode("utf-8")
             if _HEARTBEAT_RE.match(raw):
