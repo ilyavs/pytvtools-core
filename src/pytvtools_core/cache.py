@@ -212,10 +212,15 @@ class MarketDataCache:
 
         Returns ``{"fetched": N, "inserted": M}``.
         """
+        old_bars = self.query(symbol, timeframe)
         self._delete_bars(symbol, timeframe)
         all_bars = await self._fetch_all(symbol, timeframe, chunk_size)
         if not all_bars:
-            logger.warning("refresh_all got 0 bars for %s %s — skipping store", symbol, timeframe)
+            if old_bars:
+                logger.warning("refresh_all got 0 bars for %s %s — restoring %d old bars", symbol, timeframe, len(old_bars))
+                self._store_bars(symbol, timeframe, old_bars, incremental=False)
+                return {"fetched": 0, "inserted": 0, "restored": len(old_bars)}
+            logger.warning("refresh_all got 0 bars for %s %s — no old data to restore", symbol, timeframe)
             return {"fetched": 0, "inserted": 0}
         self._store_bars(symbol, timeframe, all_bars, incremental=False)
         return {"fetched": len(all_bars), "inserted": len(all_bars)}
