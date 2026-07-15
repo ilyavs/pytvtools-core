@@ -210,17 +210,30 @@ class MarketDataCache:
         Drops existing cache for (symbol, timeframe), fetches full history
         via ``get_ohlcv_all``, then does a fresh INSERT.
 
+        Retries the fetch up to 3 times with exponential backoff when
+        it returns 0 bars (transient rate-limit / timeout recovery).
+
         Returns ``{"fetched": N, "inserted": M}``.
         """
+        import secrets
+
         old_bars = self.query(symbol, timeframe)
         self._delete_bars(symbol, timeframe)
-        all_bars = await self._fetch_all(symbol, timeframe, chunk_size)
+        all_bars: list[OHLCVBar] = []
+        for attempt in range(3):
+            if attempt > 0:
+                backoff = (4 ** attempt) + secrets.randbelow(1000) / 1000
+                logger.warning("refresh_all retry %d for %s %s in %.1fs", attempt + 1, symbol, timeframe, backoff)
+                await asyncio.sleep(backoff)
+            all_bars = await self._fetch_all(symbol, timeframe, chunk_size)
+            if all_bars:
+                break
         if not all_bars:
             if old_bars:
-                logger.warning("refresh_all got 0 bars for %s %s — restoring %d old bars", symbol, timeframe, len(old_bars))
+                logger.warning("refresh_all gave up on %s %s after 3 attempts — restoring %d old bars", symbol, timeframe, len(old_bars))
                 self._store_bars(symbol, timeframe, old_bars, incremental=False)
                 return {"fetched": 0, "inserted": 0, "restored": len(old_bars)}
-            logger.warning("refresh_all got 0 bars for %s %s — no old data to restore", symbol, timeframe)
+            logger.warning("refresh_all gave up on %s %s after 3 attempts — no old data", symbol, timeframe)
             return {"fetched": 0, "inserted": 0}
         self._store_bars(symbol, timeframe, all_bars, incremental=False)
         return {"fetched": len(all_bars), "inserted": len(all_bars)}

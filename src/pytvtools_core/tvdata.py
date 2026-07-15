@@ -378,10 +378,12 @@ class TVData:
             except asyncio.TimeoutError:
                 consecutive_timeouts += 1
                 if consecutive_timeouts >= max_consecutive_timeouts:
-                    raise asyncio.TimeoutError(
-                        f"Connection stalled for {symbol} ({interval}): "
-                        f"{consecutive_timeouts} consecutive timeouts"
+                    logger.warning(
+                        "Connection stalled for %s (%s) after %d timeouts — returning %d bars",
+                        symbol, interval, consecutive_timeouts, len(all_bars),
                     )
+                    all_bars.sort(key=lambda b: b["timestamp"])
+                    return all_bars
                 await asyncio.sleep(2 ** consecutive_timeouts)
                 continue
             if isinstance(raw, bytes):
