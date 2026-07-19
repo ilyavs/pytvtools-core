@@ -207,18 +207,14 @@ class MarketDataCache:
     ) -> dict[str, int]:
         """Fetch ALL available bars via pagination, replacing existing data.
 
-        Drops existing cache for (symbol, timeframe), fetches full history
-        via ``get_ohlcv_all``, then does a fresh INSERT.
-
-        Retries the fetch up to 3 times with exponential backoff when
-        it returns 0 bars (transient rate-limit / timeout recovery).
+        Fetches first, THEN deletes old data — so if the job is canceled
+        mid-fetch, existing data is never touched.  Retries 0-bar fetches
+        3× with exponential backoff.
 
         Returns ``{"fetched": N, "inserted": M}``.
         """
         import secrets
 
-        old_bars = self.query(symbol, timeframe)
-        self._delete_bars(symbol, timeframe)
         all_bars: list[OHLCVBar] = []
         for attempt in range(3):
             if attempt > 0:
@@ -229,13 +225,9 @@ class MarketDataCache:
             if all_bars:
                 break
         if not all_bars:
-            if old_bars:
-                logger.warning("refresh_all gave up on %s %s after 3 attempts — restoring %d old bars", symbol, timeframe, len(old_bars))
-                self._store_bars(symbol, timeframe, old_bars, incremental=False)
-                return {"fetched": 0, "inserted": 0, "restored": len(old_bars)}
-            logger.warning("refresh_all gave up on %s %s after 3 attempts — no old data", symbol, timeframe)
+            logger.warning("refresh_all gave up on %s %s after 3 attempts — no data", symbol, timeframe)
             return {"fetched": 0, "inserted": 0}
-        self._store_bars(symbol, timeframe, all_bars, incremental=False)
+        self._replace_bars(symbol, timeframe, all_bars)
         return {"fetched": len(all_bars), "inserted": len(all_bars)}
 
     async def refresh_multi(
@@ -460,6 +452,49 @@ class MarketDataCache:
     # ------------------------------------------------------------------
     #  Store
     # ------------------------------------------------------------------
+
+    def _replace_bars(
+        self, symbol: str, timeframe: str, bars: list[dict]
+    ) -> None:
+        """Atomically replace all bars for (symbol, timeframe).
+
+        Uses ``replaceWhere`` in spark mode (single Delta commit).
+        In SDK mode, deletes then inserts (safe because caller fetches
+        before calling this — a mid-operation cancel only loses the
+        narrow DELETE→INSERT window, not the long fetch window).
+        """
+        if self._mode == "local":
+            self._store_local(symbol, timeframe, bars, incremental=False)
+        elif self._mode == "spark":
+            self._replace_spark(symbol, timeframe, bars)
+        else:
+            self._delete_bars(symbol, timeframe)
+            self._store_sdk(symbol, timeframe, bars, incremental=False)
+
+    def _replace_spark(
+        self, symbol: str, timeframe: str, bars: list[dict]
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        rows = [
+            (
+                symbol,
+                timeframe,
+                datetime.fromtimestamp(b["timestamp"], tz=timezone.utc),
+                float(b["open"]), float(b["high"]), float(b["low"]),
+                float(b["close"]), float(b["volume"]),
+                now,
+                _fmt_tv_timestamp(b["timestamp"], timeframe),
+            )
+            for b in bars
+        ]
+        df = self._spark.createDataFrame(rows, schema=(
+            "symbol STRING, timeframe STRING, timestamp TIMESTAMP, "
+            "open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, "
+            "volume DOUBLE, _updated_at TIMESTAMP, timestamp_str STRING"
+        ))
+        df.write.mode("overwrite").option(
+            "replaceWhere", f"symbol = '{symbol}' AND timeframe = '{timeframe}'"
+        ).insertInto(_TABLE)
 
     def _store_bars(
         self, symbol: str, timeframe: str, bars: list[dict], incremental: bool
