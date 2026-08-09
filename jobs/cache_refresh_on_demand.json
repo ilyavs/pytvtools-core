@@ -28,7 +28,7 @@
         "retry_on_timeout": false,
         "run_if": "ALL_SUCCESS",
         "task_key": "refresh_single",
-        "timeout_seconds": 3600
+        "timeout_seconds": 21600
       }
     ],
     "timeout_seconds": 0,

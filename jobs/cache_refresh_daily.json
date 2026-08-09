@@ -7,9 +7,9 @@
     "email_notifications": {},
     "format": "MULTI_TASK",
     "git_source": {
-      "git_branch": "master",
+      "git_branch": "main",
       "git_provider": "github",
-      "git_url": "https://github.com/ilyavs/pytvtools-core-public"
+      "git_url": "https://github.com/ilyavs/pytvtools-core"
     },
     "max_concurrent_runs": 1,
     "name": "cache_refresh_daily",
@@ -34,7 +34,7 @@
         },
         "run_if": "ALL_SUCCESS",
         "task_key": "refresh_1d",
-        "timeout_seconds": 3600
+        "timeout_seconds": 21600
       }
     ],
     "timeout_seconds": 0,
