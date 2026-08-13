@@ -258,5 +258,6 @@ if mode == "backfill":
     out = pd.merge_asof(out, spx, on="ts", direction="backward")
     out = out.rename(columns={"ts": "timestamp"})
     spark.createDataFrame(out).write.mode("overwrite") \
+         .option("overwriteSchema", "true") \
          .saveAsTable("workspace.chartdata.absorption_ratio")
     print("Backfilled workspace.chartdata.absorption_ratio")
