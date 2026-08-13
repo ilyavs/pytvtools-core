@@ -248,7 +248,7 @@ if mode == "backfill":
     import pandas as pd
 
     out = pd.DataFrame({
-        "timestamp": daily.index[ends_d].astype("int64"),
+        "ts": daily.index[ends_d].astype("int64"),
         "ar_daily": ar_daily,
         "ar_weekly": np.nan,
         "spx_close": np.nan,
