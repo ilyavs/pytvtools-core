@@ -17,7 +17,7 @@
       "enabled": true
     },
     "schedule": {
-      "pause_status": "PAUSED",
+      "pause_status": "UNPAUSED",
       "quartz_cron_expression": "0 30 12 1 * ? *",
       "timezone_id": "America/New_York"
     },
@@ -27,6 +27,7 @@
         "email_notifications": {},
         "notebook_task": {
           "base_parameters": {
+            "concurrency": "10",
             "timeframe": "1M"
           },
           "notebook_path": "notebooks/cache_refresh",
@@ -34,7 +35,7 @@
         },
         "run_if": "ALL_SUCCESS",
         "task_key": "refresh_1m",
-        "timeout_seconds": 21600
+        "timeout_seconds": 43200
       }
     ],
     "timeout_seconds": 0,
