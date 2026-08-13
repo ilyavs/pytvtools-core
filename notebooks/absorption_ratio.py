@@ -244,14 +244,11 @@ except Exception as exc:
 # COMMAND ----------
 
 if mode == "backfill":
-    import numpy as np
     import pandas as pd
 
     out = pd.DataFrame({
         "ts": daily.index[ends_d].astype("int64"),
         "ar_daily": ar_daily,
-        "ar_weekly": np.nan,
-        "spx_close": np.nan,
     })
     # Align weekly AR + SPX close to the daily axis via merge_asof.
     wk = pd.DataFrame({"ts": dates_w.astype("int64"), "ar_weekly": ar_weekly})
