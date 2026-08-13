@@ -3,7 +3,7 @@ name = "pytvtools-core"
 version = "0.1.0"
 description = "Pure Python TradingView tools - indicators, watchlists, TVData WebSocket fetcher."
 requires-python = ">=3.11"
-dependencies = ["websockets>=16.0"]
+dependencies = ["websockets>=16.0", "numpy>=1.26"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
