@@ -36,6 +36,25 @@
         "run_if": "ALL_SUCCESS",
         "task_key": "refresh_1m",
         "timeout_seconds": 43200
+      },
+      {
+        "disabled": false,
+        "email_notifications": {},
+        "notebook_task": {
+          "base_parameters": {
+            "daily_window": "500",
+            "mode": "backfill",
+            "n_eigenvectors": "1",
+            "spx_symbol": "SPCFD:SPX",
+            "universe": "SPDR_SECTORS",
+            "weekly_window": "52"
+          },
+          "notebook_path": "notebooks/absorption_ratio",
+          "source": "GIT"
+        },
+        "run_if": "ALL_SUCCESS",
+        "task_key": "ar_refresh",
+        "timeout_seconds": 7200
       }
     ],
     "timeout_seconds": 0,
