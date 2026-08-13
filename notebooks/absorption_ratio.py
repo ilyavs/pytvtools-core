@@ -22,6 +22,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q websockets
+
+# COMMAND ----------
+
 import sys
 from datetime import datetime, timezone
 
