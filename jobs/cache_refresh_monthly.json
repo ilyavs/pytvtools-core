@@ -38,6 +38,11 @@
         "timeout_seconds": 43200
       },
       {
+        "depends_on": [
+          {
+            "task_key": "refresh_1m"
+          }
+        ],
         "disabled": false,
         "email_notifications": {},
         "notebook_task": {
