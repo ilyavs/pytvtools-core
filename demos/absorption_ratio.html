@@ -7,7 +7,7 @@
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #11171C; font-family: -apple-system, sans-serif; display: flex; justify-content: center; }
+  body { background: #11171C; font-family: -apple-system, sans-serif; display: flex; flex-wrap: wrap; justify-content: center; }
   .chart-wrap { width: 1200px; display: flex; flex-direction: row; }
   .chart-ticker { color: #E8ECF0; padding: 12px 0 4px; font-size: 15px; font-weight: 600; }
 </style>
@@ -36,6 +36,40 @@
     <span class="tv-legend-value">0.39</span>
   </div></div>
 </div>
+</div>
+<div class="chart-notes">
+  <h3>About this chart</h3>
+  <p>
+    The <strong>absorption ratio (AR)</strong> measures the fraction of the total variance of a set
+    of asset returns that is explained, or &ldquo;absorbed&rdquo;, by a fixed number of eigenvectors
+    of the return covariance matrix. A high value implies the market is tightly coupled
+    (&ldquo;compact&rdquo;) and therefore fragile: shocks propagate more quickly and broadly than
+    when markets are loosely linked.
+  </p>
+  <p><strong>Calculation.</strong> Universe: the nine original SPDR Select Sector ETFs
+  (XLK, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLU; the 1998-listed sectors, excluding the later
+  XLC and XLRE). Daily and weekly returns are aligned to a common calendar
+  (<span>1998-12-22</span>&rarr;<span>2026-08-07</span>). For each window we compute the
+  eigen-decomposition of the return covariance matrix and set
+  AR&nbsp;=&nbsp;&Sigma;<sub>i=1&nbsp;&hellip;&nbsp;k</sub>&nbsp;&lambda;<sub>i</sub>&nbsp;/&nbsp;&Sigma;<sub>i</sub>&nbsp;&lambda;<sub>i</sub>
+  with the top k&nbsp;=&nbsp;1 eigenvector (<span>n=1</span>). The daily series uses a rolling
+  500-bar window; the weekly series uses a rolling 52-bar window. AR is plotted beneath
+  S&amp;P&nbsp;500 candles (SPCFD:SPX) on a shared time axis.
+  </p>
+  <p><strong>Reference.</strong>
+  Mark Kritzman, Yuanzhen Li, S&eacute;bastien Page, and Roberto Rigobon,
+  &ldquo;Principal Components as a Measure of Systemic Risk,&rdquo;
+  <em>The Journal of Portfolio Management</em>, Summer 2011, 37(4):112&ndash;126,
+  doi:10.3905/jpm.2011.37.4.112.
+  The working paper (March 2010) is available on SSRN (No.&nbsp;1582687).
+  </p>
+  <blockquote>
+    &ldquo;Compact markets do not always lead to asset depreciation, but most significant stock
+    market drawdowns have been preceded by spikes in the absorption ratio. This suggests that spikes
+    in the absorption ratio are a near necessary, but not sufficient, condition for market
+    crashes.&rdquo; &mdash; Kritzman, Li, Page &amp; Rigobon (2011), p.&nbsp;118
+  </blockquote>
+  <p class="chart-notes-foot">Not investment advice. For research and education only.</p>
 </div>
 <style>
 .chart-panes {
@@ -79,6 +113,22 @@
 }
 .tv-legend-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv-legend-value { text-align: right; color: #758696; font-variant-numeric: tabular-nums; }
+.chart-notes {
+  width: 1200px; flex-basis: 100%; margin: 14px 0 0; padding: 14px 18px;
+  background: rgba(17, 23, 28, 0.9);
+  border: 1px solid #2A3440; border-radius: 6px;
+  color: #C7D0DA; font-family: -apple-system, sans-serif; font-size: 13px;
+  line-height: 1.55;
+}
+.chart-notes h3 { color: #E8ECF0; font-size: 14px; margin-bottom: 8px; }
+.chart-notes p { margin: 0 0 8px; }
+.chart-notes .chart-notes-foot { color: #758696; font-size: 11px; margin-bottom: 0; }
+.chart-notes blockquote {
+  margin: 10px 0 10px 2px; padding: 8px 12px;
+  border-left: 3px solid hsl(137.5, 65%, 55%);
+  background: rgba(255, 255, 255, 0.03);
+  color: #E8ECF0; font-style: italic;
+}
 </style>
 <script>
 (function() {
