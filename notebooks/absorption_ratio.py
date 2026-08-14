@@ -334,7 +334,7 @@ if mode == "view":
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{ background: #11171C; font-family: -apple-system, sans-serif; display: flex; flex-wrap: wrap; justify-content: center; }}
-  .chart-wrap {{ width: 1200px; max-width: 100%; display: flex; flex-direction: row; }}
+  .chart-wrap {{ width: 1200px; max-width: 100%; display: flex; flex-direction: row; flex-wrap: wrap; }}
   .chart-ticker {{ color: #E8ECF0; padding: 12px 0 4px; font-size: 15px; font-weight: 600; width: 100%; }}
   .selector {{ width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 0 10px; }}
   .selector-label {{ color: #C7D0DA; font-size: 13px; }}
@@ -347,11 +347,11 @@ if mode == "view":
 </head>
 <body>
 <div class="chart-ticker">AR ({param_labels}) vs {spx_symbol}</div>
+<div class="selector">
+  <span class="selector-label">Parameters:</span>
+  {selector_buttons}
+</div>
 <div class="chart-wrap">
-  <div class="selector">
-    <span class="selector-label">Parameters:</span>
-    {selector_buttons}
-  </div>
   <div class="chart-panes">
     <div id="chart0" style="width:100%;height:360px"></div>
     <div id="chart1" style="width:100%;height:260px"></div>
@@ -446,6 +446,7 @@ if mode == "view":
   background: rgba(255, 255, 255, 0.03); color: #E8ECF0; font-style: italic;
 }}
 @media (max-width: 980px) {{
+  .chart-panes {{ flex: 1 1 100%; }}
   .chart-legends {{ width: 100%; flex-direction: row; padding-left: 0; padding-top: 8px; }}
   .tv-legend {{ flex: 1; min-width: 0; }}
   .selector {{ flex-wrap: wrap; }}
@@ -570,7 +571,7 @@ if mode == "view":
   document.querySelectorAll('.selector button').forEach(function(b) {{
     b.addEventListener('click', function() {{ applyParam(b.dataset.param); }});
   }});
-  rebuildArMap(DEFAULT_KEY);
+  applyParam(DEFAULT_KEY);
 
   // ── crosshair value tracking in legends (per pane) ──
   function trackLegend(chIdx) {{

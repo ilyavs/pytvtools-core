@@ -35,3 +35,11 @@ macd_vals = macd(closes, fast=12, slow=26, signal=9)
 ```bash
 pytest tests/ -v
 ```
+
+## Synced from pytvtools
+
+`src/pytvtools_core/`, `tests/`, `notebooks/`, `jobs/`, and `demos/` are carried here by
+`python scripts/sync_core.py` run in the pytvtools repo (target: this repo's local clone
+`../pytvtools-core-public`), then pushed to GitHub. **Do not hand-edit `demos/` HTML** —
+`demos/absorption_ratio.html` is a generated artifact of
+`notebooks/absorption_ratio.py` (see pytvtools `CLAUDE.md` → "Demo HTML products").
