@@ -296,6 +296,15 @@ if mode == "view":
         })
 
     # ── AR axis is FIXED 0–1 (AR is a ratio of eigenvalues) ─────────
+    # ── per-param weekly AR all-time low (horizontal line) ─────────
+    atl_by_key = {
+        p["key"]: min(
+            (d["value"] for d in p["arWeekly"] if "value" in d),
+            default=None,
+        )
+        for p in params
+    }
+
     # ── last values (for legend, default = n=1) ─────────────────────
     def last_non_none(line: list[dict]):
         for d in reversed(line):
@@ -448,6 +457,7 @@ if mode == "view":
 (function() {{
   var SPX = {spx_json};
   var PARAMS = {params_json};
+  var ATL = {atl_json};
   var DEFAULT_KEY = {default_key_json};
 
   var chart0 = window.chart0 = LightweightCharts.createChart(
@@ -464,6 +474,14 @@ if mode == "view":
   window.s1_0 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(0.0, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
   window.s1_1 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(137.5, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
   chart1.priceScale("right").applyOptions({{ autoScale: false, minValue: 0, maxValue: 1 }});
+
+  // ── weekly AR all-time-low price line (updates per param) ──
+  var atlLine = s1_1.createPriceLine({{ price: ATL[DEFAULT_KEY] ?? 0, color: "#E91E63", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "ATL" }});
+  function updateAtlLine(key) {{
+    var p = ATL[key];
+    if (p === undefined || p === null) atlLine.applyOptions({{ visible: false }});
+    else atlLine.applyOptions({{ price: p, visible: true }});
+  }}
 
   // ── time-scale sync ──
   var charts = [chart0, chart1];
@@ -549,6 +567,7 @@ if mode == "view":
     curKey = key;
     s1_0.setData(PARAMS[key].arDaily);
     s1_1.setData(PARAMS[key].arWeekly);
+    updateAtlLine(key);
     ctx['s1_0']._lastVal = lastVal(PARAMS[key].arDaily);
     ctx['s1_1']._lastVal = lastVal(PARAMS[key].arWeekly);
     rebuildArMap(key);
@@ -648,6 +667,7 @@ if mode == "view":
             separators=(",", ":"),
         ),
         default_key_json=json.dumps(default_key),
+        atl_json=json.dumps(atl_by_key, separators=(",", ":")),
         spx_last=spx_last,
         ar_daily_last_js=ar_daily_last,
         ar_weekly_last_js=ar_weekly_last,
