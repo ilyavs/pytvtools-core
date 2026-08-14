@@ -463,7 +463,7 @@ if mode == "view":
   );
   window.s1_0 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(0.0, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
   window.s1_1 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(137.5, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
-  chart1.priceScale("right").applyOptions({{ autoscale: false, minValue: 0, maxValue: 1 }});
+  chart1.priceScale("right").applyOptions({{ autoScale: false, minValue: 0, maxValue: 1 }});
 
   // ── time-scale sync ──
   var charts = [chart0, chart1];
