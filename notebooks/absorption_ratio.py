@@ -295,15 +295,7 @@ if mode == "view":
             "arWeekly": align_series(spx_times, p["ar_weekly"], forward_fill=True),
         })
 
-    # ── global AR range across ALL params' both lines (+5%) ─────────
-    all_vals = [d["value"] for p in params for line in (p["arDaily"], p["arWeekly"])
-                for d in line if "value" in d]
-    lo, hi = min(all_vals), max(all_vals)
-    pad = (hi - lo) * 0.05
-    if pad == 0:
-        pad = abs(hi) * 0.05 + 1e-6
-    ar_min, ar_max = round(lo - pad, 6), round(hi + pad, 6)
-
+    # ── AR axis is FIXED 0–1 (AR is a ratio of eigenvalues) ─────────
     # ── last values (for legend, default = n=1) ─────────────────────
     def last_non_none(line: list[dict]):
         for d in reversed(line):
@@ -456,12 +448,11 @@ if mode == "view":
 (function() {{
   var SPX = {spx_json};
   var PARAMS = {params_json};
-  var AR_MIN = {ar_min}, AR_MAX = {ar_max};
   var DEFAULT_KEY = {default_key_json};
 
   var chart0 = window.chart0 = LightweightCharts.createChart(
     document.getElementById("chart0"),
-    {{"height": 360, "layout": {{"textColor": "#E8ECF0", "background": {{"type": "solid", "color": "#11171C"}}}}, "grid": {{"vertLines": {{"color": "#2A3440"}}, "horzLines": {{"color": "#2A3440"}}}}, "crosshair": {{"mode": 0}}, "rightPriceScale": {{"borderColor": "#2A3440"}}, "timeScale": {{"timeVisible": true, "secondsVisible": false, "borderColor": "#2A3440"}}}}
+    {{"height": 360, "layout": {{"textColor": "#E8ECF0", "background": {{"type": "solid", "color": "#11171C"}}}}, "grid": {{"vertLines": {{"color": "#2A3440"}}, "horzLines": {{"color": "#2A3440"}}}}, "crosshair": {{"mode": 0}}, "rightPriceScale": {{"mode": 1, "borderColor": "#2A3440"}}, "timeScale": {{"timeVisible": true, "secondsVisible": false, "borderColor": "#2A3440"}}}}
   );
   window.cs0 = chart0.addSeries(LightweightCharts.CandlestickSeries, {{"upColor": "#26a69a", "downColor": "#ef5350", "borderUpColor": "#26a69a", "borderDownColor": "#ef5350", "wickUpColor": "#26a69a", "wickDownColor": "#ef5350"}});
   cs0.setData(SPX);
@@ -472,7 +463,7 @@ if mode == "view":
   );
   window.s1_0 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(0.0, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
   window.s1_1 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(137.5, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
-  chart1.priceScale("right").applyOptions({{ autoscale: false, minValue: AR_MIN, maxValue: AR_MAX }});
+  chart1.priceScale("right").applyOptions({{ autoscale: false, minValue: 0, maxValue: 1 }});
 
   // ── time-scale sync ──
   var charts = [chart0, chart1];
@@ -656,8 +647,6 @@ if mode == "view":
             {p["key"]: {"arDaily": p["arDaily"], "arWeekly": p["arWeekly"]} for p in params},
             separators=(",", ":"),
         ),
-        ar_min=ar_min,
-        ar_max=ar_max,
         default_key_json=json.dumps(default_key),
         spx_last=spx_last,
         ar_daily_last_js=ar_daily_last,
