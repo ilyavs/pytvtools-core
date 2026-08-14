@@ -184,10 +184,12 @@ if mode == "backfill":
     from pytvtools_core.measures import rolling_absorption_ratio
 
     ends_d, ar_daily = rolling_absorption_ratio(
-        daily.to_numpy(float), window=daily_window, n_eigenvectors=n_eigenvectors
+        daily.to_numpy(float), window=daily_window, n_eigenvectors=n_eigenvectors,
+        half_life=daily_window / 2,
     )
     ends_w, ar_weekly = rolling_absorption_ratio(
-        weekly.to_numpy(float), window=weekly_window, n_eigenvectors=n_eigenvectors
+        weekly.to_numpy(float), window=weekly_window, n_eigenvectors=n_eigenvectors,
+        half_life=weekly_window / 2,
     )
 
     # window-end timestamps (unix seconds)
@@ -296,14 +298,18 @@ if mode == "view":
         })
 
     # ── AR axis is FIXED 0–1 (AR is a ratio of eigenvalues) ─────────
-    # ── per-param weekly AR all-time low (horizontal line) ─────────
-    atl_by_key = {
-        p["key"]: min(
-            (d["value"] for d in p["arWeekly"] if "value" in d),
-            default=None,
-        )
-        for p in params
-    }
+    # ── per-param AR all-time low per series (horizontal lines) ─────
+    def _atl(series: str) -> dict:
+        return {
+            p["key"]: min(
+                (d["value"] for d in p[series] if "value" in d),
+                default=None,
+            )
+            for p in params
+        }
+
+    atl_daily_by_key = _atl("arDaily")
+    atl_weekly_by_key = _atl("arWeekly")
 
     # ── last values (for legend, default = n=1) ─────────────────────
     def last_non_none(line: list[dict]):
@@ -353,34 +359,37 @@ if mode == "view":
   {selector_buttons}
 </div>
 <div class="chart-wrap">
-  <div class="chart-panes">
-    <div id="chart0" style="width:100%;height:360px"></div>
-    <div id="chart1" style="width:100%;height:260px"></div>
-  </div>
-  <div class="chart-legends">
-    <div id="l0" class="tv-legend" data-pane="0" style="height:360px;">
-      <div class="tv-legend-row" data-series="cs0">
-        <span class="tv-legend-eye" data-visible="1">&#128065;</span>
-        <span class="tv-legend-swatch" style="background:#26a69a"></span>
-        <span class="tv-legend-name">{spx_symbol}</span>
-        <span class="tv-legend-value">{spx_last:.2f}</span>
-      </div>
-    </div>
-    <div id="l1" class="tv-legend" data-pane="1" style="height:260px;">
-      <div class="tv-legend-row" data-series="s1_0">
-        <span class="tv-legend-eye" data-visible="1">&#128065;</span>
-        <span class="tv-legend-swatch" style="background:hsl(0.0, 65%, 55%)"></span>
-        <span class="tv-legend-name">AR daily ({daily_window}d)</span>
-        <span class="tv-legend-value">{ar_daily_last_legend}</span>
-      </div>
-      <div class="tv-legend-row" data-series="s1_1">
-        <span class="tv-legend-eye" data-visible="1">&#128065;</span>
-        <span class="tv-legend-swatch" style="background:hsl(137.5, 65%, 55%)"></span>
-        <span class="tv-legend-name">AR weekly ({weekly_window}w)</span>
-        <span class="tv-legend-value">{ar_weekly_last_legend}</span>
-      </div>
-    </div>
-  </div>
+<div class="chart-panes">
+     <div id="chart0" style="width:100%;height:360px"></div>
+     <div id="chart1" style="width:100%;height:200px"></div>
+     <div id="chart2" style="width:100%;height:200px"></div>
+   </div>
+   <div class="chart-legends">
+     <div id="l0" class="tv-legend" data-pane="0" style="height:360px;">
+       <div class="tv-legend-row" data-series="cs0">
+         <span class="tv-legend-eye" data-visible="1">&#128065;</span>
+         <span class="tv-legend-swatch" style="background:#26a69a"></span>
+         <span class="tv-legend-name">{spx_symbol}</span>
+         <span class="tv-legend-value">{spx_last:.2f}</span>
+       </div>
+     </div>
+     <div id="l1" class="tv-legend" data-pane="1" style="height:200px;">
+       <div class="tv-legend-row" data-series="s1_0">
+         <span class="tv-legend-eye" data-visible="1">&#128065;</span>
+         <span class="tv-legend-swatch" style="background:hsl(0.0, 65%, 55%)"></span>
+         <span class="tv-legend-name">AR daily ({daily_window}d)</span>
+         <span class="tv-legend-value">{ar_daily_last_legend}</span>
+       </div>
+     </div>
+     <div id="l2" class="tv-legend" data-pane="2" style="height:200px;">
+       <div class="tv-legend-row" data-series="s1_1">
+         <span class="tv-legend-eye" data-visible="1">&#128065;</span>
+         <span class="tv-legend-swatch" style="background:hsl(137.5, 65%, 55%)"></span>
+         <span class="tv-legend-name">AR weekly ({weekly_window}w)</span>
+         <span class="tv-legend-value">{ar_weekly_last_legend}</span>
+       </div>
+     </div>
+   </div>
 </div>
 <div class="chart-notes">
   <h3>About this chart</h3>
@@ -395,27 +404,30 @@ if mode == "view":
   (XLK, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLU; the 1998-listed sectors, excluding the later
   XLC and XLRE). Daily and weekly returns are aligned to a common calendar
   (<span>{t0}</span>&rarr;<span>{t1}</span>). For each window we compute the
-  eigen-decomposition of the return covariance matrix and set
+  eigen-decomposition of the return covariance matrix, estimated with exponential
+  weighting whose half-life equals half the window (matching Kritzman, Li, Page &amp;
+  Rigobon 2011), and set
   AR&nbsp;=&nbsp;&Sigma;<sub>i=1&nbsp;&hellip;&nbsp;k</sub>&nbsp;&lambda;<sub>i</sub>&nbsp;/&nbsp;&Sigma;<sub>i</sub>&nbsp;&lambda;<sub>i</sub>.
   The parameter selector above switches between retaining the top
   k&nbsp;=&nbsp;1 eigenvector (<span>n=1</span>) and the top
   k&nbsp;=&nbsp;2 eigenvectors (<span>n=2</span>). The daily
   series uses a rolling 500-bar window; the weekly series uses a rolling 52-bar window. AR is
-  plotted beneath S&amp;P&nbsp;500 candles ({spx_symbol}) on a shared time axis. The two panes
-  share crosshairs; the AR axis is fixed to the full range across both parameter settings.
+  plotted beneath S&amp;P&nbsp;500 candles ({spx_symbol}) on a shared time axis, in two
+  separate panes (daily and weekly) that share crosshairs; the AR axis is fixed to the full range
+  across both parameter settings, and each pane shows its own all-time-low (ATL) line.
   </p>
   <p><strong>Reference.</strong>
   Mark Kritzman, Yuanzhen Li, S&eacute;bastien Page, and Roberto Rigobon,
   &ldquo;Principal Components as a Measure of Systemic Risk,&rdquo;
   <em>The Journal of Portfolio Management</em>, Summer 2011, 37(4):112&ndash;126,
   doi:10.3905/jpm.2011.37.4.112.
-  The working paper (March 2010) is available on SSRN (No.&nbsp;1582687).
+  The working paper (April 2010) is available on SSRN (No.&nbsp;1582687).
   </p>
   <blockquote>
     &ldquo;Compact markets do not always lead to asset depreciation, but most significant stock
     market drawdowns have been preceded by spikes in the absorption ratio. This suggests that spikes
     in the absorption ratio are a near necessary, but not sufficient, condition for market
-    crashes.&rdquo; &mdash; Kritzman, Li, Page &amp; Rigobon (2011), p.&nbsp;118
+    crashes.&rdquo; &mdash; Kritzman, Li, Page &amp; Rigobon (2011), p.&nbsp;123
   </blockquote>
   <p class="chart-notes-foot">Not investment advice. For research and education only.</p>
 </div>
@@ -457,7 +469,8 @@ if mode == "view":
 (function() {{
   var SPX = {spx_json};
   var PARAMS = {params_json};
-  var ATL = {atl_json};
+  var ATL_DAILY = {atl_daily_json};
+  var ATL_WEEKLY = {atl_weekly_json};
   var DEFAULT_KEY = {default_key_json};
 
   var chart0 = window.chart0 = LightweightCharts.createChart(
@@ -469,22 +482,29 @@ if mode == "view":
 
   var chart1 = window.chart1 = LightweightCharts.createChart(
     document.getElementById("chart1"),
-    {{"height": 260, "layout": {{"textColor": "#E8ECF0", "background": {{"type": "solid", "color": "#11171C"}}}}, "grid": {{"vertLines": {{"color": "#2A3440"}}, "horzLines": {{"color": "#2A3440"}}}}, "crosshair": {{"mode": 0}}, "rightPriceScale": {{"borderColor": "#2A3440"}}, "timeScale": {{"timeVisible": true, "secondsVisible": false, "borderColor": "#2A3440"}}}}
+    {{"height": 200, "layout": {{"textColor": "#E8ECF0", "background": {{"type": "solid", "color": "#11171C"}}}}, "grid": {{"vertLines": {{"color": "#2A3440"}}, "horzLines": {{"color": "#2A3440"}}}}, "crosshair": {{"mode": 0}}, "rightPriceScale": {{"borderColor": "#2A3440"}}, "timeScale": {{"timeVisible": true, "secondsVisible": false, "borderColor": "#2A3440"}}}}
   );
   window.s1_0 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(0.0, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
-  window.s1_1 = chart1.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(137.5, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
   chart1.priceScale("right").applyOptions({{ autoScale: false, minValue: 0, maxValue: 1 }});
 
-  // ── weekly AR all-time-low price line (updates per param) ──
-  var atlLine = s1_1.createPriceLine({{ price: ATL[DEFAULT_KEY] ?? 0, color: "#E91E63", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "ATL" }});
-  function updateAtlLine(key) {{
-    var p = ATL[key];
-    if (p === undefined || p === null) atlLine.applyOptions({{ visible: false }});
-    else atlLine.applyOptions({{ price: p, visible: true }});
+  var chart2 = window.chart2 = LightweightCharts.createChart(
+    document.getElementById("chart2"),
+    {{"height": 200, "layout": {{"textColor": "#E8ECF0", "background": {{"type": "solid", "color": "#11171C"}}}}, "grid": {{"vertLines": {{"color": "#2A3440"}}, "horzLines": {{"color": "#2A3440"}}}}, "crosshair": {{"mode": 0}}, "rightPriceScale": {{"borderColor": "#2A3440"}}, "timeScale": {{"timeVisible": true, "secondsVisible": false, "borderColor": "#2A3440"}}}}
+  );
+  window.s1_1 = chart2.addSeries(LightweightCharts.LineSeries, {{"lineWidth": 2, "color": "hsl(137.5, 65%, 55%)", "lastValueVisible": false, "priceLineVisible": false}});
+  chart2.priceScale("right").applyOptions({{ autoScale: false, minValue: 0, maxValue: 1 }});
+
+  // ── per-pane AR all-time-low price lines (update per param) ──
+  var atlLineDaily = s1_0.createPriceLine({{ price: ATL_DAILY[DEFAULT_KEY] ?? 0, color: "#E91E63", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "ATL" }});
+  var atlLineWeekly = s1_1.createPriceLine({{ price: ATL_WEEKLY[DEFAULT_KEY] ?? 0, color: "#E91E63", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "ATL" }});
+  function updateAtlLine(line, key, map) {{
+    var p = map[key];
+    if (p === undefined || p === null) line.applyOptions({{ visible: false }});
+    else line.applyOptions({{ price: p, visible: true }});
   }}
 
   // ── time-scale sync ──
-  var charts = [chart0, chart1];
+  var charts = [chart0, chart1, chart2];
   var syncing = false;
   function sync(range) {{
     if (syncing) return;
@@ -505,7 +525,8 @@ if mode == "view":
   ctx['s1_0'] = {{ visible: true, series: s1_0, colorKey: 'color',   color: 'hsl(0.0, 65%, 55%)',   _lastVal: {ar_daily_last_js} }};
   ctx['s1_1'] = {{ visible: true, series: s1_1, colorKey: 'color',   color: 'hsl(137.5, 65%, 55%)', _lastVal: {ar_weekly_last_js} }};
   ctx._chartPanes[0] = ["cs0"];
-  ctx._chartPanes[1] = ["s1_0", "s1_1"];
+  ctx._chartPanes[1] = ["s1_0"];
+  ctx._chartPanes[2] = ["s1_1"];
 
   function setupLegend(paneIdx) {{
     var leg = document.getElementById('l' + paneIdx);
@@ -551,14 +572,18 @@ if mode == "view":
   }}
   setupLegend(0);
   setupLegend(1);
+  setupLegend(2);
 
   // ── value maps for crosshair-position sync ──
   var spxCloseByTime = {{}};
   SPX.forEach(function(b) {{ spxCloseByTime[b.time] = b.close; }});
-  var arValByTime = {{}};
+  var arDailyValByTime = {{}};
+  var arWeeklyValByTime = {{}};
   function rebuildArMap(key) {{
-    for (var k in arValByTime) delete arValByTime[k];
-    PARAMS[key].arDaily.forEach(function(p) {{ if (p.value !== undefined) arValByTime[p.time] = p.value; }});
+    for (var k in arDailyValByTime) delete arDailyValByTime[k];
+    for (var k in arWeeklyValByTime) delete arWeeklyValByTime[k];
+    PARAMS[key].arDaily.forEach(function(p) {{ if (p.value !== undefined) arDailyValByTime[p.time] = p.value; }});
+    PARAMS[key].arWeekly.forEach(function(p) {{ if (p.value !== undefined) arWeeklyValByTime[p.time] = p.value; }});
   }}
 
   // ── parameter selector ──
@@ -567,14 +592,15 @@ if mode == "view":
     curKey = key;
     s1_0.setData(PARAMS[key].arDaily);
     s1_1.setData(PARAMS[key].arWeekly);
-    updateAtlLine(key);
+    updateAtlLine(atlLineDaily, key, ATL_DAILY);
+    updateAtlLine(atlLineWeekly, key, ATL_WEEKLY);
     ctx['s1_0']._lastVal = lastVal(PARAMS[key].arDaily);
     ctx['s1_1']._lastVal = lastVal(PARAMS[key].arWeekly);
     rebuildArMap(key);
-    var leg = document.getElementById('l1');
-    [['s1_0', ctx['s1_0']._lastVal], ['s1_1', ctx['s1_1']._lastVal]].forEach(function(pair) {{
-      var el = leg.querySelector('[data-series="' + pair[0] + '"] .tv-legend-value');
-      if (el) el.textContent = (pair[1] !== undefined && pair[1] !== null) ? pair[1].toFixed(2) : '';
+    [[1, 's1_0', ctx['s1_0']._lastVal], [2, 's1_1', ctx['s1_1']._lastVal]].forEach(function(pair) {{
+      var leg = document.getElementById('l' + pair[0]);
+      var el = leg.querySelector('[data-series="' + pair[1] + '"] .tv-legend-value');
+      if (el) el.textContent = (pair[2] !== undefined && pair[2] !== null) ? pair[2].toFixed(2) : '';
     }});
     document.querySelectorAll('.selector button').forEach(function(b) {{ b.classList.toggle('active', b.dataset.param === key); }});
   }}
@@ -614,6 +640,7 @@ if mode == "view":
   }}
   trackLegend(0);
   trackLegend(1);
+  trackLegend(2);
 
   // ── crosshair position sync (both directions, guarded) ──
   var _xGuard = false;
@@ -630,8 +657,10 @@ if mode == "view":
       }} finally {{ _xGuard = false; }}
     }});
   }}
-  link(chart0, chart1, arValByTime);
+  link(chart0, chart1, arDailyValByTime);
+  link(chart0, chart2, arWeeklyValByTime);
   link(chart1, chart0, spxCloseByTime);
+  link(chart2, chart0, spxCloseByTime);
 }})();
 </script>
 </body>
@@ -667,7 +696,8 @@ if mode == "view":
             separators=(",", ":"),
         ),
         default_key_json=json.dumps(default_key),
-        atl_json=json.dumps(atl_by_key, separators=(",", ":")),
+        atl_daily_json=json.dumps(atl_daily_by_key, separators=(",", ":")),
+        atl_weekly_json=json.dumps(atl_weekly_by_key, separators=(",", ":")),
         spx_last=spx_last,
         ar_daily_last_js=ar_daily_last,
         ar_weekly_last_js=ar_weekly_last,
