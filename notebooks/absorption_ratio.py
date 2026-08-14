@@ -397,8 +397,8 @@ if mode == "view":
   eigen-decomposition of the return covariance matrix and set
   AR&nbsp;=&nbsp;&Sigma;<sub>i=1&nbsp;&hellip;&nbsp;k</sub>&nbsp;&lambda;<sub>i</sub>&nbsp;/&nbsp;&Sigma;<sub>i</sub>&nbsp;&lambda;<sub>i</sub>.
   The parameter selector above switches between retaining the top
-  k&nbsp;=&nbsp;1 eigenvector (<span>n=1</span>) and
-  k&nbsp;=&nbsp;20% of the eigenvectors (<span>n=0.2</span>, the frds.io default). The daily
+  k&nbsp;=&nbsp;1 eigenvector (<span>n=1</span>) and the top
+  k&nbsp;=&nbsp;2 eigenvectors (<span>n=2</span>). The daily
   series uses a rolling 500-bar window; the weekly series uses a rolling 52-bar window. AR is
   plotted beneath S&amp;P&nbsp;500 candles ({spx_symbol}) on a shared time axis. The two panes
   share crosshairs; the AR axis is fixed to the full range across both parameter settings.
