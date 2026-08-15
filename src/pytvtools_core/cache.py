@@ -38,6 +38,8 @@ from urllib.parse import quote, unquote
 
 import websockets
 
+from pytvtools_core.symbols import resolve_symbols
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -300,17 +302,16 @@ class MarketDataCache:
     # -- query is set in __init__ to _query_local or _query_uc
 
     # ------------------------------------------------------------------
-    #  Exchange prefix fallback for bare symbols
+    #  Bare-symbol resolution fallback
     # ------------------------------------------------------------------
-
-    _EXCHANGE_PREFIXES = ["NYSE:", "NASDAQ:", "AMEX:"]
 
     @staticmethod
     def _candidates(symbol: str) -> list[str]:
-        """Return [original, *prefixed] if bare, else just [original]."""
+        """Return the resolved prefixed symbol; fall back to the original."""
         if ":" in symbol:
             return [symbol]
-        return [symbol] + [f"{p}{symbol}" for p in MarketDataCache._EXCHANGE_PREFIXES]
+        resolved = resolve_symbols([symbol]).get(symbol)
+        return [resolved] if resolved else [symbol]
 
     # ------------------------------------------------------------------
     #  Fetch

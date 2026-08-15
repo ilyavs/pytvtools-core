@@ -17,6 +17,7 @@ import urllib.request
 from typing import Any
 
 from pytvtools_core.watchlists import screen
+from pytvtools_core.symbols import resolve_symbols
 
 # 273 GICS codes, 2023 edition: {code: {name, parent_code, level_num}}
 _GICS_HIERARCHY: dict[str, dict[str, str]] = {
@@ -862,14 +863,18 @@ def _rollup(sub_code: str) -> dict[str, str]:
     }
 
 
-def _resolve_symbol(bare: str, prefix_map: dict[str, str]) -> str:
-    """Prefer an exchange-prefixed match (tolerant of . vs -); else bare."""
-    if bare in prefix_map:
-        return prefix_map[bare]
-    for key, val in prefix_map.items():
-        if key.replace("-", ".") == bare.replace("-", "."):
-            return val
-    return bare
+def _apply_symbol_map(row: dict[str, str], prefix_map: dict[str, str]) -> dict[str, str]:
+    out = dict(row)
+    bare = out["symbol"]
+    out["symbol"] = (
+        prefix_map.get(bare)
+        or next(
+            (v for k, v in prefix_map.items()
+             if k.replace("-", ".") == bare.replace("-", ".")),
+            bare,
+        )
+    )
+    return out
 
 
 def get_gics_classifications(
@@ -914,25 +919,13 @@ def get_gics_classifications(
     prefix_map = symbol_map or {}
     out = []
     for r in rows:
-        row = dict(r)
-        row["symbol"] = _resolve_symbol(r["symbol"], prefix_map)
-        out.append(row)
+        out.append(_apply_symbol_map(r, prefix_map))
     return out
 
 
 # ---------------------------------------------------------------------------
 # TradingView classifications + tagged row builder
 # ---------------------------------------------------------------------------
-
-def _symbol_map_from_tv(tv_rows: list[dict[str, str]]) -> dict[str, str]:
-    """bare -> exchange-prefixed map, tolerant of `.`/`-` (BRK-B vs BRK.B)."""
-    out: dict[str, str] = {}
-    for r in tv_rows:
-        sym = r["symbol"]
-        bare = sym.split(":", 1)[1] if ":" in sym else sym
-        out[bare.replace("-", ".")] = sym
-    return out
-
 
 def get_tv_classifications(
     *,
@@ -959,15 +952,15 @@ def classification_rows(
 ) -> list[dict[str, str | None]]:
     """Union GICS + TV classifications, tagged by taxonomy, with refreshed_at.
 
-    Derives the ``bare -> prefixed`` symbol map from the TV sweep itself
-    (single ``screen()`` call per exchange — no second market sweep), then
-    feeds it to ``get_gics_classifications`` so the GICS table's ``symbol``
-    matches the form ``ohlcv`` stores.
+    Resolves bare/dash GICS constituent symbols to exchange-prefixed form via
+    ``resolve_symbols()`` so the GICS table's ``symbol`` matches the form
+    ``ohlcv`` stores.  TV rows already come prefixed from ``screen()``.
     """
     from datetime import datetime, timezone
 
     tv = get_tv_classifications(exchanges=exchanges)
-    symbol_map = _symbol_map_from_tv(tv)
+    bare = [c["symbol"] for c in _fetch_constituents()]
+    symbol_map = resolve_symbols(bare)
     gics = get_gics_classifications(
         force_refetch=force_refetch, symbol_map=symbol_map
     )

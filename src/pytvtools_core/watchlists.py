@@ -21,6 +21,8 @@ import urllib.error
 import urllib.request
 from typing import Iterator
 
+from pytvtools_core.symbols import resolve_symbols
+
 _SCANNER_URL = "https://scanner.tradingview.com/{market}/scan"
 _PAGE_SIZE = 100
 
@@ -34,7 +36,8 @@ class Watchlist:
     name : str
         Human-readable label.
     symbols : tuple[str, ...]
-        Ticker symbols as bare strings (no exchange prefix).
+        Ticker symbols as exchange-prefixed strings (``"NYSE:BRK.B"``,
+        ``"AMEX:XLK"``).  No bare tickers.
     """
 
     name: str
@@ -65,32 +68,32 @@ class Watchlist:
 SPDR_SECTORS = Watchlist(
     name="SPDR S&P 500 Select Sectors",
     symbols=(
-        "XLK",   # Technology
-        "XLC",   # Communication Services
-        "XLY",   # Consumer Discretionary
-        "XLP",   # Consumer Staples
-        "XLE",   # Energy
-        "XLF",   # Financials
-        "XLV",   # Health Care
-        "XLI",   # Industrials
-        "XLB",   # Materials
-        "XLRE",  # Real Estate
-        "XLU",   # Utilities
+        "AMEX:XLK",   # Technology
+        "AMEX:XLC",   # Communication Services
+        "AMEX:XLY",   # Consumer Discretionary
+        "AMEX:XLP",   # Consumer Staples
+        "AMEX:XLE",   # Energy
+        "AMEX:XLF",   # Financials
+        "AMEX:XLV",   # Health Care
+        "AMEX:XLI",   # Industrials
+        "AMEX:XLB",   # Materials
+        "AMEX:XLRE",  # Real Estate
+        "AMEX:XLU",   # Utilities
     ),
 )
 
 SPDR_SECTORS_CORE = Watchlist(
     name="SPDR S&P 500 Select Sectors — original 9 (no XLC/XLRE)",
     symbols=(
-        "XLK",   # Technology
-        "XLY",   # Consumer Discretionary
-        "XLP",   # Consumer Staples
-        "XLE",   # Energy
-        "XLF",   # Financials
-        "XLV",   # Health Care
-        "XLI",   # Industrials
-        "XLB",   # Materials
-        "XLU",   # Utilities
+        "AMEX:XLK",   # Technology
+        "AMEX:XLY",   # Consumer Discretionary
+        "AMEX:XLP",   # Consumer Staples
+        "AMEX:XLE",   # Energy
+        "AMEX:XLF",   # Financials
+        "AMEX:XLV",   # Health Care
+        "AMEX:XLI",   # Industrials
+        "AMEX:XLB",   # Materials
+        "AMEX:XLU",   # Utilities
     ),
 )
 
@@ -101,25 +104,25 @@ SPDR_SECTORS_CORE = Watchlist(
 SPDR_INDUSTRIES = Watchlist(
     name="SPDR Industry ETFs",
     symbols=(
-        "XBI",   # Biotech
-        "XPH",   # Pharmaceuticals
-        "XHS",   # Health Care Services
-        "XHE",   # Health Care Equipment
-        "XAR",   # Aerospace & Defense
-        "XHB",   # Homebuilders
-        "XRT",   # Retail
-        "XOP",   # Oil & Gas Exploration & Production
-        "XES",   # Oil & Gas Equipment & Services
-        "XME",   # Metals & Mining
-        "XSD",   # Semiconductor
-        "XSW",   # Software & Services
-        "XTL",   # Telecom
-        "XNTK",  # NYSE Technology
-        "XITK",  # FactSet Innovative Technology
-        "KBE",   # Banking
-        "KRE",   # Regional Banking
-        "SLX",   # Steel
-        "XWEB",  # Internet
+        "AMEX:XBI",   # Biotech
+        "AMEX:XPH",   # Pharmaceuticals
+        "AMEX:XHS",   # Health Care Services
+        "AMEX:XHE",   # Health Care Equipment
+        "AMEX:XAR",   # Aerospace & Defense
+        "AMEX:XHB",   # Homebuilders
+        "AMEX:XRT",   # Retail
+        "AMEX:XOP",   # Oil & Gas Exploration & Production
+        "AMEX:XES",   # Oil & Gas Equipment & Services
+        "AMEX:XME",   # Metals & Mining
+        "AMEX:XSD",   # Semiconductor
+        "AMEX:XSW",   # Software & Services
+        "AMEX:XTL",   # Telecom
+        "AMEX:XNTK",  # NYSE Technology
+        "AMEX:XITK",  # FactSet Innovative Technology
+        "AMEX:KBE",   # Banking
+        "AMEX:KRE",   # Regional Banking
+        "AMEX:SLX",   # Steel
+        "LSE:XWEB",   # Internet (US listing delisted; LSE fund only)
     ),
 )
 
@@ -156,7 +159,9 @@ def get_sp500(*, force_refetch: bool = False) -> Watchlist:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
         tables = pd.read_html(url)
         df = tables[0]
-        symbols = tuple(str(s).replace(".", "-") for s in df["Symbol"].tolist())
+        bare = tuple(str(s).replace(".", "-") for s in df["Symbol"].tolist())
+        resolved = resolve_symbols(list(bare))
+        symbols = tuple(resolved[t] for t in bare if t in resolved)
         _SP500_CACHE = Watchlist(name="S&P 500", symbols=symbols)
     except Exception:
         _SP500_CACHE = _SP500_STATIC
@@ -164,61 +169,60 @@ def get_sp500(*, force_refetch: bool = False) -> Watchlist:
     return _SP500_CACHE
 
 
+# Exchange-prefixed S&P 500 constituent tickers (bare/dash forms resolved
+# via symbol-search / scanner sweep; delisted or renamed members dropped).
 _SP500_TICKERS = (
-    "A", "AAPL", "ABBV", "ABNB", "ABT", "ACGL", "ACN", "ADBE", "ADI", "ADM",
-    "ADP", "ADSK", "AEE", "AEP", "AES", "AFG", "AFL", "AGCO", "AGR", "AIG",
-    "AIZ", "AJG", "AKAM", "ALB", "ALGN", "ALL", "ALLE", "AMAT", "AMCR", "AMD",
-    "AME", "AMGN", "AMH", "AMP", "AMT", "AMZN", "ANET", "ANSS", "AON", "AOS",
-    "APA", "APD", "APO", "APP", "APTV", "ARE", "ATO", "ATUS", "AVB", "AVGO",
-    "AVY", "AWK", "AXON", "AXP", "AZO", "AZPN", "BA", "BAC", "BALL", "BAX",
-    "BBY", "BDX", "BEKE", "BEN", "BF_B", "BG", "BIIB", "BIO", "BK", "BKNG",
-    "BKR", "BLK", "BLL", "BMY", "BR", "BRK_B", "BRO", "BSX", "BWA", "BXP",
-    "C", "CAG", "CAH", "CARR", "CAT", "CB", "CBOE", "CBRE", "CCL", "CDNS",
-    "CDW", "CE", "CEG", "CF", "CFG", "CHD", "CHRW", "CHTR", "CI", "CINF",
-    "CL", "CLX", "CMCSA", "CME", "CMG", "CMI", "CMS", "CNC", "CNP", "COF",
-    "COIN", "COO", "COP", "COR", "COST", "COTY", "CPB", "CPRT", "CPT", "CRL",
-    "CRM", "CRWD", "CSCO", "CSGP", "CSX", "CTAS", "CTLT", "CTRA", "CTSH", "CTVA",
-    "CVS", "CVX", "CZR", "D", "DAL", "DAY", "DD", "DE", "DECK", "DELL",
-    "DFS", "DG", "DGX", "DHI", "DHR", "DIS", "DISCA", "DISH", "DLR", "DLTR",
-    "DOV", "DOW", "DPZ", "DRI", "DRVN", "DVA", "DVN", "DXCM", "EA", "EBAY",
-    "ECL", "ED", "EFX", "EG", "EIX", "EL", "ELS", "EMN", "EMR", "ENPH",
-    "EOG", "EPAM", "EQIX", "EQR", "EQT", "ERIE", "ES", "ESS", "ETN", "ETR",
-    "ETSY", "EVRG", "EW", "EXC", "EXPD", "EXR", "F", "FANG", "FAST", "FCX",
-    "FDS", "FDX", "FE", "FFIV", "FI", "FICO", "FIS", "FITB", "FMC", "FOX",
-    "FOXA", "FRT", "FSLR", "FTNT", "FTV", "GD", "GE", "GEHC", "GEN", "GILD",
-    "GIS", "GL", "GLW", "GM", "GNRC", "GOLD", "GOOG", "GOOGL", "GPC", "GPN",
-    "GPS", "GRMN", "GS", "GWW", "HAL", "HAS", "HBAN", "HCA", "HD", "HES",
-    "HIG", "HII", "HLT", "HOLX", "HON", "HPE", "HPQ", "HRL", "HSIC", "HST",
-    "HSY", "HUBB", "HUM", "HWM", "IBM", "ICE", "IDXX", "IEX", "IFF", "ILMN",
-    "INCY", "INTC", "INTU", "INVH", "IOT", "IP", "IPG", "IQV", "IR", "IRM",
-    "ISRG", "IT", "ITW", "IVZ", "J", "JBHT", "JBL", "JCI", "JKHY", "JNJ",
-    "JNPR", "JPM", "K", "KDP", "KEY", "KEYS", "KHC", "KIM", "KKR", "KLAC",
-    "KMB", "KMI", "KMX", "KO", "KR", "L", "LDOS", "LEN", "LH", "LHX",
-    "LIN", "LKQ", "LLY", "LMT", "LNT", "LOW", "LPLA", "LRCX", "LSXMA", "LSXMK",
-    "LULU", "LUV", "LVS", "LW", "LYB", "LYV", "M", "MA", "MAA", "MANH",
-    "MAR", "MAS", "MASI", "MCD", "MCHP", "MCK", "MCO", "MDLZ", "MDT", "MET",
-    "META", "MGM", "MHK", "MKC", "MKTX", "MLM", "MMC", "MMM", "MNST", "MO",
-    "MOH", "MOS", "MPC", "MPWR", "MRK", "MRNA", "MRO", "MS", "MSCI", "MSFT",
-    "MSI", "MSTR", "MTB", "MTCH", "MTD", "MU", "NCLH", "NDAQ", "NDSN", "NEE",
-    "NEM", "NET", "NFLX", "NI", "NKE", "NOC", "NOW", "NRG", "NSC", "NTAP",
-    "NTRS", "NUE", "NVDA", "NVR", "NWS", "NWSA", "NXPI", "O", "ODFL", "OKE",
-    "OMC", "ON", "ORCL", "ORLY", "OTIS", "OXY", "PANW", "PARA", "PAYC", "PAYX",
-    "PCAR", "PCG", "PEG", "PEP", "PFE", "PFG", "PG", "PGR", "PH", "PHM",
-    "PKG", "PLD", "PLTR", "PM", "PNC", "PNR", "PNW", "PODD", "POOL", "PPG",
-    "PPL", "PRU", "PSA", "PSX", "PTC", "PWR", "PYPL", "QCOM", "QRVO", "RCL",
-    "REGN", "RF", "RJF", "RL", "RMD", "ROK", "ROKU", "ROL", "ROP", "ROST",
-    "RS", "RSG", "RTX", "RVTY", "S", "SBAC", "SBUX", "SCHW", "SCI", "SHW",
-    "SIRI", "SJM", "SLB", "SLG", "SMCI", "SNA", "SNOW", "SNPS", "SO", "SOLV",
-    "SPG", "SPGI", "SQ", "SRE", "STE", "STLD", "STT", "STX", "STZ", "SWK",
-    "SWKS", "SYF", "SYK", "SYY", "T", "TAP", "TDG", "TDY", "TECH", "TEL",
-    "TER", "TFC", "TFX", "TGT", "TJX", "TMO", "TMUS", "TPR", "TRGP", "TRMB",
-    "TROW", "TRV", "TSCO", "TSLA", "TSN", "TT", "TTD", "TTWO", "TXN", "TXT",
-    "TYL", "UAL", "UBER", "UDR", "UHS", "ULTA", "UNH", "UNM", "UNP", "UPS",
-    "URI", "USB", "V", "VICI", "VLO", "VLTO", "VMC", "VRSK", "VRSN", "VRT",
-    "VRTX", "VST", "VTR", "VTRS", "VZ", "WAB", "WAT", "WBA", "WBD", "WDAY",
-    "WDC", "WEC", "WELL", "WFC", "WHR", "WM", "WMB", "WMT", "WRB", "WRK",
-    "WSM", "WST", "WTW", "WY", "WYNN", "XEL", "XOM", "XYL", "YUM", "ZBH",
-    "ZBRA", "ZION", "ZTS",
+    "NYSE:A", "NASDAQ:AAPL", "NYSE:ABBV", "NASDAQ:ABNB", "NYSE:ABT", "NASDAQ:ACGL", "NYSE:ACN", "NASDAQ:ADBE", "NASDAQ:ADI", "NYSE:ADM",
+    "NASDAQ:ADP", "NASDAQ:ADSK", "NYSE:AEE", "NASDAQ:AEP", "NYSE:AES", "NYSE:AFG", "NYSE:AFL", "NYSE:AGCO", "NYSE:AIG", "NYSE:AIZ",
+    "NYSE:AJG", "NASDAQ:AKAM", "NYSE:ALB", "NASDAQ:ALGN", "NYSE:ALL", "NYSE:ALLE", "NASDAQ:AMAT", "NYSE:AMCR", "NASDAQ:AMD", "NYSE:AME",
+    "NASDAQ:AMGN", "NYSE:AMH", "NYSE:AMP", "NYSE:AMT", "NASDAQ:AMZN", "NYSE:ANET", "NYSE:AON", "NYSE:AOS", "NASDAQ:APA", "NYSE:APD",
+    "NYSE:APO", "NASDAQ:APP", "NYSE:APTV", "NYSE:ARE", "NYSE:ATO", "NYSE:AVB", "NASDAQ:AVGO", "NYSE:AVY", "NYSE:AWK", "NASDAQ:AXON",
+    "NYSE:AXP", "NYSE:AZO", "NYSE:BA", "NYSE:BAC", "NYSE:BALL", "NYSE:BAX", "NYSE:BBY", "NYSE:BDX", "NYSE:BEN", "NYSE:BF.B",
+    "NYSE:BG", "NASDAQ:BIIB", "NYSE:BIO", "NASDAQ:BKNG", "NASDAQ:BKR", "NYSE:BLK", "NYSE:BMY", "NYSE:BR", "NYSE:BRK.B", "NYSE:BRO",
+    "NYSE:BSX", "NYSE:BWA", "NYSE:BXP", "NYSE:C", "NYSE:CAG", "NYSE:CAH", "NYSE:CARR", "NYSE:CAT", "NYSE:CB", "NYSE:CBRE",
+    "NYSE:CCL", "NASDAQ:CDNS", "NASDAQ:CDW", "NYSE:CE", "NASDAQ:CEG", "NYSE:CF", "NYSE:CFG", "NYSE:CHD", "NASDAQ:CHRW", "NASDAQ:CHTR",
+    "NYSE:CI", "NASDAQ:CINF", "NYSE:CL", "NYSE:CLX", "NASDAQ:CMCSA", "NASDAQ:CME", "NYSE:CMG", "NYSE:CMI", "NYSE:CMS", "NYSE:CNC",
+    "NYSE:CNP", "NYSE:COF", "NASDAQ:COIN", "NASDAQ:COO", "NYSE:COP", "NYSE:COR", "NASDAQ:COST", "NYSE:COTY", "NASDAQ:CPB", "NASDAQ:CPRT",
+    "NYSE:CPT", "NYSE:CRL", "NYSE:CRM", "NASDAQ:CRWD", "NASDAQ:CSCO", "NASDAQ:CSGP", "NASDAQ:CSX", "NASDAQ:CTAS", "NASDAQ:CTSH", "NYSE:CTVA",
+    "NYSE:CVS", "NYSE:CVX", "NASDAQ:CZR", "NYSE:D", "NYSE:DAL", "NYSE:DD", "NYSE:DE", "NYSE:DECK", "NYSE:DELL", "NYSE:DG",
+    "NYSE:DGX", "NYSE:DHI", "NYSE:DHR", "NYSE:DIS", "NYSE:DLR", "NASDAQ:DLTR", "NYSE:DOV", "NYSE:DOW", "NASDAQ:DPZ", "NYSE:DRI",
+    "NASDAQ:DRVN", "NYSE:DVA", "NYSE:DVN", "NASDAQ:DXCM", "NASDAQ:EBAY", "NYSE:ECL", "NYSE:ED", "NYSE:EFX", "NYSE:EG", "NYSE:EIX",
+    "NYSE:EL", "NYSE:ELS", "NYSE:EMN", "NYSE:EMR", "NASDAQ:ENPH", "NYSE:EOG", "NYSE:EPAM", "NASDAQ:EQIX", "NYSE:EQR", "NYSE:EQT",
+    "NASDAQ:ERIE", "NYSE:ES", "NYSE:ESS", "NYSE:ETN", "NYSE:ETR", "NYSE:ETSY", "NASDAQ:EVRG", "NYSE:EW", "NASDAQ:EXC", "NYSE:EXPD",
+    "NYSE:EXR", "NYSE:F", "NASDAQ:FANG", "NASDAQ:FAST", "NYSE:FCX", "NYSE:FDS", "NYSE:FDX", "NYSE:FE", "NASDAQ:FFIV", "NYSE:FICO",
+    "NYSE:FIS", "NYSE:FITB", "NYSE:FMC", "NASDAQ:FOX", "NASDAQ:FOXA", "NYSE:FRT", "NASDAQ:FSLR", "NASDAQ:FTNT", "NYSE:FTV", "NYSE:GD",
+    "NYSE:GE", "NASDAQ:GEHC", "NASDAQ:GEN", "NASDAQ:GILD", "NYSE:GIS", "NYSE:GL", "NYSE:GLW", "NYSE:GM", "NYSE:GNRC", "NYSE:GOLD",
+    "NASDAQ:GOOG", "NASDAQ:GOOGL", "NYSE:GPC", "NYSE:GPN", "NYSE:GRMN", "NYSE:GS", "NYSE:GWW", "NYSE:HAL", "NASDAQ:HAS", "NASDAQ:HBAN",
+    "NYSE:HCA", "NYSE:HD", "NYSE:HIG", "NYSE:HII", "NYSE:HLT", "NASDAQ:HON", "NYSE:HPE", "NYSE:HPQ", "NYSE:HRL", "NASDAQ:HSIC",
+    "NASDAQ:HST", "NYSE:HSY", "NYSE:HUBB", "NYSE:HUM", "NYSE:HWM", "NYSE:IBM", "NYSE:ICE", "NASDAQ:IDXX", "NYSE:IEX", "NYSE:IFF",
+    "NASDAQ:ILMN", "NASDAQ:INCY", "NASDAQ:INTC", "NASDAQ:INTU", "NYSE:INVH", "NYSE:IOT", "NYSE:IP", "NYSE:IQV", "NYSE:IR", "NYSE:IRM",
+    "NASDAQ:ISRG", "NYSE:IT", "NYSE:ITW", "NYSE:IVZ", "NYSE:J", "NASDAQ:JBHT", "NYSE:JBL", "NYSE:JCI", "NASDAQ:JKHY", "NYSE:JNJ",
+    "NYSE:JPM", "NASDAQ:KDP", "NYSE:KEY", "NYSE:KEYS", "NASDAQ:KHC", "NYSE:KIM", "NYSE:KKR", "NASDAQ:KLAC", "NASDAQ:KMB", "NYSE:KMI",
+    "NYSE:KMX", "NYSE:KO", "NYSE:KR", "NYSE:L", "NYSE:LDOS", "NYSE:LEN", "NYSE:LH", "NYSE:LHX", "NASDAQ:LIN", "NASDAQ:LKQ",
+    "NYSE:LLY", "NYSE:LMT", "NASDAQ:LNT", "NYSE:LOW", "NASDAQ:LPLA", "NASDAQ:LRCX", "NASDAQ:LULU", "NYSE:LUV", "NYSE:LVS", "NYSE:LW",
+    "NYSE:LYB", "NYSE:LYV", "NYSE:M", "NYSE:MA", "NYSE:MAA", "NASDAQ:MANH", "NASDAQ:MAR", "NYSE:MAS", "NYSE:MCD", "NASDAQ:MCHP",
+    "NYSE:MCK", "NYSE:MCO", "NASDAQ:MDLZ", "NYSE:MDT", "NYSE:MET", "NASDAQ:META", "NYSE:MGM", "NYSE:MHK", "NYSE:MKC", "NASDAQ:MKTX",
+    "NYSE:MLM", "NYSE:MMM", "NASDAQ:MNST", "NYSE:MO", "NYSE:MOH", "NYSE:MOS", "NYSE:MPC", "NASDAQ:MPWR", "NYSE:MRK", "NASDAQ:MRNA",
+    "NYSE:MS", "NYSE:MSCI", "NASDAQ:MSFT", "NYSE:MSI", "NASDAQ:MSTR", "NYSE:MTB", "NASDAQ:MTCH", "NYSE:MTD", "NASDAQ:MU", "NYSE:NCLH",
+    "NASDAQ:NDAQ", "NASDAQ:NDSN", "NYSE:NEE", "NYSE:NEM", "NYSE:NET", "NASDAQ:NFLX", "NYSE:NI", "NYSE:NKE", "NYSE:NOC", "NYSE:NOW",
+    "NYSE:NRG", "NYSE:NSC", "NASDAQ:NTAP", "NASDAQ:NTRS", "NYSE:NUE", "NASDAQ:NVDA", "NYSE:NVR", "NASDAQ:NWS", "NASDAQ:NWSA", "NASDAQ:NXPI",
+    "NYSE:O", "NASDAQ:ODFL", "NYSE:OKE", "NYSE:OMC", "NASDAQ:ON", "NYSE:ORCL", "NASDAQ:ORLY", "NYSE:OTIS", "NYSE:OXY", "NASDAQ:PANW",
+    "NASDAQ:PARA", "NYSE:PAYC", "NASDAQ:PAYX", "NASDAQ:PCAR", "NYSE:PCG", "NYSE:PEG", "NASDAQ:PEP", "NYSE:PFE", "NASDAQ:PFG", "NYSE:PG",
+    "NYSE:PGR", "NYSE:PH", "NYSE:PHM", "NYSE:PKG", "NYSE:PLD", "NASDAQ:PLTR", "NYSE:PM", "NYSE:PNC", "NYSE:PNR", "NYSE:PNW",
+    "NASDAQ:PODD", "NASDAQ:POOL", "NYSE:PPG", "NYSE:PPL", "NYSE:PRU", "NYSE:PSA", "NYSE:PSX", "NASDAQ:PTC", "NYSE:PWR", "NASDAQ:PYPL",
+    "NASDAQ:QCOM", "NASDAQ:QRVO", "NYSE:RCL", "NASDAQ:REGN", "NYSE:RF", "NYSE:RJF", "NYSE:RL", "NYSE:RMD", "NYSE:ROK", "NASDAQ:ROKU",
+    "NYSE:ROL", "NASDAQ:ROP", "NASDAQ:ROST", "NYSE:RS", "NYSE:RSG", "NYSE:RTX", "NYSE:RVTY", "NYSE:S", "NASDAQ:SBAC", "NASDAQ:SBUX",
+    "NYSE:SCHW", "NYSE:SCI", "NYSE:SHW", "NASDAQ:SIRI", "NYSE:SJM", "NYSE:SLB", "NYSE:SLG", "NASDAQ:SMCI", "NYSE:SNA", "NYSE:SNOW",
+    "NASDAQ:SNPS", "NYSE:SO", "NYSE:SOLV", "NYSE:SPG", "NYSE:SPGI", "NYSE:SRE", "NYSE:STE", "NASDAQ:STLD", "NYSE:STT", "NASDAQ:STX",
+    "NYSE:STZ", "NYSE:SWK", "NASDAQ:SWKS", "NYSE:SYF", "NYSE:SYK", "NYSE:SYY", "NYSE:T", "NYSE:TAP", "NYSE:TDG", "NYSE:TDY",
+    "NASDAQ:TECH", "NYSE:TEL", "NASDAQ:TER", "NYSE:TFC", "NYSE:TFX", "NYSE:TGT", "NYSE:TJX", "NYSE:TMO", "NASDAQ:TMUS", "NYSE:TPR",
+    "NYSE:TRGP", "NASDAQ:TRMB", "NASDAQ:TROW", "NYSE:TRV", "NASDAQ:TSCO", "NASDAQ:TSLA", "NYSE:TSN", "NYSE:TT", "NASDAQ:TTD", "NASDAQ:TTWO",
+    "NASDAQ:TXN", "NYSE:TXT", "NYSE:TYL", "NASDAQ:UAL", "NYSE:UBER", "NYSE:UDR", "NYSE:UHS", "NASDAQ:ULTA", "NYSE:UNH", "NYSE:UNM",
+    "NYSE:UNP", "NYSE:UPS", "NYSE:URI", "NYSE:USB", "NYSE:V", "NYSE:VICI", "NYSE:VLO", "NYSE:VLTO", "NYSE:VMC", "NASDAQ:VRSK",
+    "NASDAQ:VRSN", "NYSE:VRT", "NASDAQ:VRTX", "NYSE:VST", "NYSE:VTR", "NASDAQ:VTRS", "NYSE:VZ", "NYSE:WAB", "NYSE:WAT", "NASDAQ:WBD",
+    "NASDAQ:WDAY", "NASDAQ:WDC", "NYSE:WEC", "NYSE:WELL", "NYSE:WFC", "NYSE:WHR", "NYSE:WM", "NYSE:WMB", "NASDAQ:WMT", "NYSE:WRB",
+    "NYSE:WSM", "NYSE:WST", "NASDAQ:WTW", "NYSE:WY", "NASDAQ:WYNN", "NASDAQ:XEL", "NYSE:XOM", "NYSE:XYL", "NYSE:YUM", "NYSE:ZBH",
+    "NASDAQ:ZBRA", "NASDAQ:ZION", "NYSE:ZTS",
 )
 
 _SP500_STATIC = Watchlist(
@@ -260,7 +264,8 @@ METALS_MINERS = Watchlist(
         # Copper
         "AMEX:COPX", "AMEX:CPER", "LSE:COPA",
         # Individual miners
-        "NEM", "FCX", "SCCO", "AA", "RIO", "BHP", "HBM", "TECK", "VALE",
+        "NYSE:NEM", "NYSE:FCX", "NYSE:SCCO", "NYSE:AA", "NYSE:RIO",
+        "NYSE:BHP", "NYSE:HBM", "NYSE:TECK", "NYSE:VALE",
     ),
 )
 
@@ -363,17 +368,17 @@ URANIUM_STRATEGIC = Watchlist(
         "NASDAQ:AREC",
         "NASDAQ:CRML",
         "NYSE:AMR",
-        "CCJ",
-        "DNN",
-        "NXE",
-        "GLO",
-        "EU",
-        "URG",
+        "NYSE:CCJ",
+        "AMEX:DNN",
+        "NYSE:NXE",
+        "AMEX:GLO",
+        "NASDAQ:EU",
+        "AMEX:URG",
         "AMEX:REMX",
         "NYSE:MP",
         "NASDAQ:NB",
         "NASDAQ:NIKL",
-        "LYC",
+        "ASX:LYC",
         "AMEX:SLX",
         "OTC:AMLIF",
         "NASDAQ:CENX",
@@ -529,25 +534,29 @@ def get_market_caps(
 ) -> dict[str, float]:
     """Market caps for an explicit ticker list via the scanner.
 
-    POSTs a ticker-list scan (``symbols.tickers``) requesting only the
-    ``market_cap_basic`` column. Returns ``{symbol: cap}`` keyed by the
-    scanner's returned symbol (exchange-prefixed, dot-form). Members whose
-    cap is null (delisted / non-tradable) are omitted.
+    Accepts prefixed (``"NYSE:BRK.B"``), dash (``"BRK-B"``), dot
+    (``"BRK.B"``), or underscore (``"BRK_B"``) forms; bare/dash/underscore
+    inputs are resolved to exchange-prefixed form via ``resolve_symbols()``
+    before POSTing.  Returns ``{symbol: cap}`` keyed by the scanner's
+    returned (prefixed) symbol.  Members whose cap is null (delisted /
+    non-tradable) are omitted.
 
     Parameters
     ----------
     symbols : list[str]
-        Explicit ticker list, e.g. ``["AAPL", "BRK.B"]``. Pass dot-form
-        (``BRK.B``), not dash-form (``BRK-B``).
+        Explicit ticker list, e.g. ``["AAPL", "BRK.B"]``.
     market : str
         Scanner market, e.g. ``"america"``.
     timeout : float
         Seconds to wait for the server response.
     """
+    resolved = resolve_symbols(list(symbols), market=market, timeout=timeout)
+    prefixed = [resolved[s] for s in symbols if s in resolved]
+
     caps: dict[str, float] = {}
     chunk_size = 500  # keep each POST modest; the scanner accepts large lists
-    for i in range(0, len(symbols), chunk_size):
-        chunk = symbols[i : i + chunk_size]
+    for i in range(0, len(prefixed), chunk_size):
+        chunk = prefixed[i : i + chunk_size]
         payload: dict[str, object] = {
             "symbols": {"tickers": list(chunk)},
             "columns": ["market_cap_basic"],

@@ -134,6 +134,30 @@ def test_get_tv_classifications_uses_screen():
     ]
 
 
+def test_classification_rows_uses_shared_resolver():
+    _reset_cache()
+    tv_rows = [
+        {"symbol": "NYSE:A", "sector": "Finance", "industry": "Major Banks"},
+    ]
+    special = {"BRK-B": "NYSE:BRK.B", "AAPL": "NASDAQ:AAPL"}
+
+    def _resolve(tickers, **kw):
+        return {t: special.get(t, f"EX:{t}") for t in tickers}
+
+    with mock.patch(
+        "pytvtools_core.classifications.screen",
+        return_value=(tv_rows, len(tv_rows)),
+    ), mock.patch(
+        "pytvtools_core.classifications.resolve_symbols",
+        side_effect=_resolve,
+    ):
+        rows = classification_rows(exchanges=("NYSE",), force_refetch=True)
+    gics_syms = {r["symbol"] for r in rows if r["taxonomy"] == "gics"}
+    assert all(":" in s for s in gics_syms)
+    assert "NYSE:BRK.B" in gics_syms
+    assert "NASDAQ:AAPL" in gics_syms
+
+
 def test_classification_rows_tags_taxonomy():
     _reset_cache()
     tv_rows = [
@@ -142,6 +166,11 @@ def test_classification_rows_tags_taxonomy():
     with mock.patch(
         "pytvtools_core.classifications.screen",
         return_value=(tv_rows, len(tv_rows)),
+    ), mock.patch(
+        "pytvtools_core.classifications.resolve_symbols",
+        side_effect=lambda tickers, **kw: {
+            t: f"EX:{t}" for t in tickers
+        },
     ):
         rows = classification_rows(
             exchanges=("NYSE",), force_refetch=True

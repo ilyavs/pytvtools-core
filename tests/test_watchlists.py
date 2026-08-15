@@ -23,6 +23,7 @@ from pytvtools_core.watchlists import (
     screen,
     get_watchlist,
     get_market_caps,
+    get_sp500,
     us_stock_rows,
     get_us_stocks,
 )
@@ -38,19 +39,19 @@ class TestWatchlist:
         assert len(SPDR_ALL) == 30
 
     def test_iter(self):
-        assert list(SPDR_SECTORS)[0] == "XLK"
-        assert list(SPDR_SECTORS)[-1] == "XLU"
+        assert list(SPDR_SECTORS)[0] == "AMEX:XLK"
+        assert list(SPDR_SECTORS)[-1] == "AMEX:XLU"
 
     def test_getitem(self):
-        assert SPDR_SECTORS[0] == "XLK"
-        assert SPDR_SECTORS[-1] == "XLU"
+        assert SPDR_SECTORS[0] == "AMEX:XLK"
+        assert SPDR_SECTORS[-1] == "AMEX:XLU"
 
     def test_contains(self):
-        assert "XLK" in SPDR_SECTORS
-        assert "XBI" not in SPDR_SECTORS
-        assert "XBI" in SPDR_INDUSTRIES
-        assert "XLK" in SPDR_ALL
-        assert "XBI" in SPDR_ALL
+        assert "AMEX:XLK" in SPDR_SECTORS
+        assert "AMEX:XBI" not in SPDR_SECTORS
+        assert "AMEX:XBI" in SPDR_INDUSTRIES
+        assert "AMEX:XLK" in SPDR_ALL
+        assert "AMEX:XBI" in SPDR_ALL
 
     def test_tuple_immutable(self):
         assert isinstance(SPDR_SECTORS.symbols, tuple)
@@ -111,7 +112,8 @@ class TestNewWatchlists:
             assert sym in METALS_MINERS
 
     def test_metals_miners_miners(self):
-        for sym in ("NEM", "FCX", "SCCO", "RIO", "BHP", "VALE"):
+        for sym in ("NYSE:NEM", "NYSE:FCX", "NYSE:SCCO", "NYSE:RIO",
+                    "NYSE:BHP", "NYSE:VALE"):
             assert sym in METALS_MINERS
 
     def test_index_futures_content(self):
@@ -148,24 +150,74 @@ class TestNewWatchlists:
 
     def test_uranium_strategic_content(self):
         for sym in ("AMEX:URA", "AMEX:URNM", "AMEX:REMX", "AMEX:SLX",
-                     "CCJ", "DNN", "NXE", "LYC"):
+                     "NYSE:CCJ", "AMEX:DNN", "NYSE:NXE", "ASX:LYC"):
             assert sym in URANIUM_STRATEGIC
 
 
 from pytvtools_core.watchlists import registry_rows, Watchlist
 
 
+class TestGetSP500:
+    def test_live_fetch_resolves_to_prefixed(self, monkeypatch):
+        import sys
+        from unittest import mock
+
+        fake_pd = mock.MagicMock()
+        fake_df = mock.MagicMock()
+        fake_df["Symbol"].tolist.return_value = ["AAPL", "BRK-B", "ZZZZ"]
+        fake_pd.read_html.return_value = [fake_df]
+        monkeypatch.setitem(sys.modules, "pandas", fake_pd)
+
+        with mock.patch(
+            "pytvtools_core.watchlists.resolve_symbols",
+            side_effect=lambda tickers, **kw: {
+                "AAPL": "NASDAQ:AAPL", "BRK-B": "NYSE:BRK.B",
+            },
+        ):
+            wl = get_sp500(force_refetch=True)
+        assert wl.symbols == ("NASDAQ:AAPL", "NYSE:BRK.B")
+
+    def test_static_snapshot_is_prefixed(self):
+        from pytvtools_core.watchlists import _SP500_STATIC
+        assert all(":" in s for s in _SP500_STATIC.symbols)
+        assert "NYSE:BRK.B" in _SP500_STATIC.symbols
+
+
+class TestNoBareTickers:
+    def test_all_static_watchlists_are_prefixed(self):
+        from pytvtools_core.watchlists import WATCHLISTS
+        for name, wl in WATCHLISTS.items():
+            for sym in wl.symbols:
+                assert ":" in sym, f"{name} has bare ticker {sym!r}"
+
+    def test_spdr_sectors_amex_prefixed(self):
+        assert SPDR_SECTORS.symbols[0] == "AMEX:XLK"
+        assert SPDR_SECTORS.symbols[-1] == "AMEX:XLU"
+        assert all(s.startswith("AMEX:") for s in SPDR_SECTORS)
+
+    def test_metals_miners_bare_entries_now_prefixed(self):
+        for sym in ("NYSE:NEM", "NYSE:FCX", "NYSE:SCCO", "NYSE:AA",
+                    "NYSE:RIO", "NYSE:BHP", "NYSE:HBM", "NYSE:TECK",
+                    "NYSE:VALE"):
+            assert sym in METALS_MINERS
+
+    def test_uranium_bare_entries_now_prefixed(self):
+        for sym in ("NYSE:CCJ", "AMEX:DNN", "NYSE:NXE", "AMEX:GLO",
+                    "NASDAQ:EU", "AMEX:URG", "ASX:LYC"):
+            assert sym in URANIUM_STRATEGIC
+
+
 class TestRegistryRows:
     def test_includes_static_watchlists(self):
         rows = registry_rows(sp500=Watchlist("S&P 500", ("FAKESP",)))
         syms = {r["symbol"] for r in rows}
-        assert "XLK" in syms
+        assert "AMEX:XLK" in syms
         assert "TVC:US10Y" in syms
         assert "AMEX:URA" in syms
 
     def test_static_rows_use_watchlist_source(self):
         rows = registry_rows(sp500=Watchlist("S&P 500", ("FAKESP",)))
-        xlk = [r for r in rows if r["symbol"] == "XLK" and r["watchlist"] == "SPDR_SECTORS"]
+        xlk = [r for r in rows if r["symbol"] == "AMEX:XLK" and r["watchlist"] == "SPDR_SECTORS"]
         assert len(xlk) == 1
         assert xlk[0]["watchlist"] == "SPDR_SECTORS"
         assert xlk[0]["source"] == "watchlist"
@@ -177,10 +229,10 @@ class TestRegistryRows:
         assert all(r["watchlist"] == "SP500" for r in sp)
 
     def test_symbol_in_multiple_watchlists_has_multiple_rows(self):
-        rows = registry_rows(sp500=Watchlist("S&P 500", ("SLX",)))
-        slx = [r for r in rows if r["symbol"] == "SLX"]
+        rows = registry_rows(sp500=Watchlist("S&P 500", ("AMEX:SLX",)))
+        slx = [r for r in rows if r["symbol"] == "AMEX:SLX"]
         assert {r["watchlist"] for r in slx} == {
-            "SPDR_INDUSTRIES", "SPDR_ALL", "SP500"}
+            "SPDR_INDUSTRIES", "SPDR_ALL", "URANIUM_STRATEGIC", "SP500"}
         assert len(slx) >= 3
 
     def test_returns_plain_dicts(self):
@@ -339,7 +391,7 @@ class TestGetMarketCaps:
 
         return _open
 
-    def test_posts_ticker_list_and_market_cap_basic(self):
+    def test_posts_prefixed_ticker_list(self):
         seen = {}
 
         def _open(req, timeout=None):
@@ -353,16 +405,43 @@ class TestGetMarketCaps:
                 ],
             }).encode())
 
-        with mock.patch("urllib.request.urlopen", side_effect=_open):
+        with mock.patch("urllib.request.urlopen", side_effect=_open), \
+             mock.patch(
+                 "pytvtools_core.watchlists.resolve_symbols",
+                 side_effect=lambda tickers, **kw: {
+                     "AAPL": "NASDAQ:AAPL", "BRK.B": "NYSE:BRK.B",
+                 },
+             ):
             caps = get_market_caps(["AAPL", "BRK.B"])
         assert seen["url"] == TestGetMarketCaps.URL
-        assert seen["data"]["symbols"] == {"tickers": ["AAPL", "BRK.B"]}
+        assert seen["data"]["symbols"] == {
+            "tickers": ["NASDAQ:AAPL", "NYSE:BRK.B"],
+        }
         assert seen["data"]["columns"] == ["market_cap_basic"]
-        assert seen["data"]["range"] == [0, 2]
         assert caps == {
             "NASDAQ:AAPL": 4460000000000.0,
             "NYSE:BRK.B": 971000000000.0,
         }
+
+    def test_accepts_dash_underscore_forms(self):
+        seen = {}
+
+        def _open(req, timeout=None):
+            seen["data"] = json.loads(req.data.decode())
+            return io.BytesIO(json.dumps({"totalCount": 1, "data": [
+                {"s": "NYSE:BRK.B", "d": [971000000000]},
+            ]}).encode())
+
+        with mock.patch("urllib.request.urlopen", side_effect=_open), \
+             mock.patch(
+                 "pytvtools_core.watchlists.resolve_symbols",
+                 side_effect=lambda tickers, **kw: {
+                     "BRK-B": "NYSE:BRK.B",
+                 },
+             ):
+            caps = get_market_caps(["BRK-B"])
+        assert seen["data"]["symbols"] == {"tickers": ["NYSE:BRK.B"]}
+        assert caps == {"NYSE:BRK.B": 971000000000.0}
 
     def test_drops_null_caps(self):
         resp = {
@@ -374,7 +453,13 @@ class TestGetMarketCaps:
             ],
         }
         with mock.patch("urllib.request.urlopen",
-                        side_effect=self._fake_urlopen([resp])):
+                        side_effect=self._fake_urlopen([resp])), \
+             mock.patch(
+                 "pytvtools_core.watchlists.resolve_symbols",
+                 side_effect=lambda tickers, **kw: {
+                     t: f"EX:{t}" for t in tickers
+                 },
+             ):
             caps = get_market_caps(["AAPL", "X", "Y"])
         assert caps == {"NASDAQ:AAPL": 4460000000000.0}
 
@@ -382,7 +467,13 @@ class TestGetMarketCaps:
         def _open(req, timeout=None):
             raise urllib.error.HTTPError(req.full_url, 500, "boom", {}, None)
 
-        with mock.patch("urllib.request.urlopen", side_effect=_open):
+        with mock.patch("urllib.request.urlopen", side_effect=_open), \
+             mock.patch(
+                 "pytvtools_core.watchlists.resolve_symbols",
+                 side_effect=lambda tickers, **kw: {
+                     t: f"EX:{t}" for t in tickers
+                 },
+             ):
             try:
                 get_market_caps(["AAPL"])
             except RuntimeError as exc:

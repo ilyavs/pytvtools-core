@@ -6,6 +6,7 @@ from pytvtools_core.watchlists import (
     BONDS, OIL, URANIUM_STRATEGIC,
     WATCHLISTS, PINK_LIST_WATCHLISTS,
 )
+from pytvtools_core.symbols import normalize_symbol, resolve_symbols
 from pytvtools_core.tvdata import TVData
 from pytvtools_core.cache import MarketDataCache
 from pytvtools_core.types import OHLCVBar
@@ -19,6 +20,7 @@ __all__ = [
     "METALS_MINERS", "INDEX_FUTURES", "INDEX_CFDS", "INDEX_ETFS",
     "BONDS", "OIL", "URANIUM_STRATEGIC",
     "WATCHLISTS", "PINK_LIST_WATCHLISTS",
+    "normalize_symbol", "resolve_symbols",
     "TVData",
     "MarketDataCache",
     "OHLCVBar",
