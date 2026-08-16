@@ -33,6 +33,9 @@ print(f"Building {OUTPUT_TABLE}")
 # COMMAND ----------
 
 rows = classification_rows()
+# Serverless (Spark Connect) requires native datetime objects for TimestampType;
+# classification_rows() returns ISO strings, which classic Spark coerced silently.
+rows = [dict(r, refreshed_at=datetime.fromisoformat(r["refreshed_at"])) for r in rows]
 print(f"Rows: {len(rows)} "
       f"({sum(1 for r in rows if r['taxonomy'] == 'gics')} gics, "
       f"{sum(1 for r in rows if r['taxonomy'] == 'tv')} tv)")
