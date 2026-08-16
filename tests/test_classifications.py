@@ -193,3 +193,25 @@ def test_classification_rows_tags_taxonomy():
         assert r["industry_group"] and r["industry"] and r["sector"]
         assert r["industry_group"] is not None
     assert len(by_tax["gics"]) == len(_GICS_CONSTITUENTS_STATIC)
+
+
+from pytvtools_core.classifications import industry_member_counts
+
+
+def test_industry_member_counts_drops_below_min():
+    rows = [
+        {"industry": "Banks"},
+        {"industry": "Banks"},
+        {"industry": "Software"},       # 1 member -> dropped at min=2
+        {"industry": None},              # ungroupped row ignored
+    ]
+    assert industry_member_counts(rows, min_members=2) == {"Banks": 2}
+
+
+def test_industry_member_counts_single_member_included_at_min1():
+    rows = [{"industry": "Banks"}, {"industry": "Software"}]
+    assert industry_member_counts(rows, min_members=1) == {"Banks": 1, "Software": 1}
+
+
+def test_industry_member_counts_empty():
+    assert industry_member_counts([], min_members=2) == {}

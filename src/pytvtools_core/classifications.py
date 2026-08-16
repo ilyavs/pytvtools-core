@@ -990,3 +990,29 @@ def classification_rows(
             "refreshed_at": refreshed_at,
         })
     return rows
+
+
+def industry_member_counts(
+    rows: list[dict[str, str | None]],
+    min_members: int = 2,
+) -> dict[str, int]:
+    """GICS-industry member counts, dropping industries below a breadth floor.
+
+    Parameters
+    ----------
+    rows : list[dict]
+        Classification rows that each carry an ``industry`` key (e.g. GICS
+        taxonomy rows from ``classification_rows()``). Rows with
+        ``industry=None`` are ignored.
+    min_members : int
+        Industries with **fewer** than this many members are excluded. Default
+        ``2`` drops the 7 single-member S&P 500 industries (62 remain); ``1``
+        keeps all grouped industries.
+    """
+    counts: dict[str, int] = {}
+    for r in rows:
+        ind = r.get("industry")
+        if ind is None:
+            continue
+        counts[ind] = counts.get(ind, 0) + 1
+    return {ind: n for ind, n in counts.items() if n >= min_members}

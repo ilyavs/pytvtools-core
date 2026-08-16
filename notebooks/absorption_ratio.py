@@ -13,9 +13,10 @@
 # MAGIC | Widget | Default | Meaning |
 # MAGIC |--------|---------|---------|
 # MAGIC | `universe` | `SPDR_SECTORS` | watchlist key (code-resolved) |
-# MAGIC | `n_eigenvectors` | `1` | int count, or 0.2 fraction |
+# MAGIC | `n_eigenvectors` | `0.2` | int count, or fraction of assets (paper: N/5) |
 # MAGIC | `daily_window` | `500` | daily variant rolling window (bars) |
 # MAGIC | `weekly_window` | `52` | weekly variant rolling window (bars) |
+# MAGIC | `min_industry_members` | `2` | GICS AR only: drop industries with fewer members |
 # MAGIC | `spx_symbol` | `SPCFD:SPX` | index plotted on the top pane |
 # MAGIC | `mode` | `view` | `backfill`=persist this run's AR to UC (param-keyed); `view`=render interactive page from all stored runs |
 
@@ -36,9 +37,10 @@ from datetime import datetime, timezone
 sys.path.insert(0, "/Workspace/Users/sl.ilya1987@gmail.com/pytvtools-core/src")
 
 dbutils.widgets.text("universe", "SPDR_SECTORS")
-dbutils.widgets.text("n_eigenvectors", "1")
+dbutils.widgets.text("n_eigenvectors", "0.2")
 dbutils.widgets.text("daily_window", "500")
 dbutils.widgets.text("weekly_window", "52")
+dbutils.widgets.text("min_industry_members", "2")
 dbutils.widgets.text("spx_symbol", "SPCFD:SPX")
 dbutils.widgets.text("mode", "view")
 
@@ -49,11 +51,15 @@ n_eigenvectors = (
 )
 daily_window = int(dbutils.widgets.get("daily_window"))
 weekly_window = int(dbutils.widgets.get("weekly_window"))
+min_industry_members = int(dbutils.widgets.get("min_industry_members"))
 spx_symbol = dbutils.widgets.get("spx_symbol")
 mode = dbutils.widgets.get("mode")
 assert mode in ("view", "backfill"), f"Invalid mode: {mode}"
 
-param_key = f"n{n_eigenvectors}_d{daily_window}_w{weekly_window}"
+if universe == "GICS":
+    param_key = f"n{n_eigenvectors}_d{daily_window}_w{weekly_window}_m{min_industry_members}"
+else:
+    param_key = f"n{n_eigenvectors}_d{daily_window}_w{weekly_window}"
 
 print(
     f"universe={universe} n_eigenvectors={n_eigenvectors} "
@@ -73,22 +79,25 @@ from pytvtools_core.watchlists import get_watchlist, get_sp500, get_us_stocks
 _VALID_KEYS = (
     "SPDR_SECTORS, SPDR_INDUSTRIES, SPDR_ALL, CRYPTO, METALS_MINERS, "
     "INDEX_FUTURES, INDEX_CFDS, INDEX_ETFS, BONDS, OIL, URANIUM_STRATEGIC, "
-    "SP500, US_STOCKS"
+    "SP500, US_STOCKS, GICS"
 )
 
-try:
-    if universe == "SP500":
-        symbols = sorted(get_sp500().symbols)
-    elif universe == "US_STOCKS":
-        symbols = sorted(get_us_stocks().symbols)
-    else:
-        wl = get_watchlist(universe)
-        symbols = sorted(wl.symbols)
-except Exception as exc:
-    print(f"Unknown universe. Valid keys: {_VALID_KEYS}")
-    raise exc
+_CLASS = "workspace.chartdata.symbol_classifications"
+_CAP_LEVELS = "workspace.chartdata.cap_index_levels"
 
-print(f"Universe {universe}: {len(symbols)} symbols")
+if universe != "GICS":
+    try:
+        if universe == "SP500":
+            symbols = sorted(get_sp500().symbols)
+        elif universe == "US_STOCKS":
+            symbols = sorted(get_us_stocks().symbols)
+        else:
+            wl = get_watchlist(universe)
+            symbols = sorted(wl.symbols)
+    except Exception as exc:
+        print(f"Unknown universe. Valid keys: {_VALID_KEYS}")
+        raise exc
+    print(f"Universe {universe}: {len(symbols)} symbols")
 
 # COMMAND ----------
 
@@ -121,10 +130,51 @@ def load_closes(symbols: list[str], timeframe: str) -> "pandas.DataFrame":
     return df.sort_index()
 
 
-closes_1d = load_closes(symbols, "1D")
-closes_1w = load_closes(symbols, "1W")
-print(f"1D closes: {closes_1d.shape} ({closes_1d.index.min()}..{closes_1d.index.max()})")
-print(f"1W closes: {closes_1w.shape} ({closes_1w.index.min()}..{closes_1w.index.max()})")
+if universe == "GICS":
+    import pandas as pd
+
+    from pytvtools_core.classifications import industry_member_counts
+
+    # industry breadth filter: keep industries with >= min_industry_members members.
+    # symbol_classifications has ONE row per gics member symbol, so the plain
+    # (non-DISTINCT) SELECT is required — DISTINCT would make every count 1 and
+    # drop all industries at min_industry_members=2.
+    cls_rows = [
+        {"industry": r["industry"]}
+        for r in spark.sql(
+            f"SELECT industry FROM {_CLASS} "
+            f"WHERE taxonomy = 'gics' AND industry IS NOT NULL"
+        ).collect()
+    ]
+    keep_counts = industry_member_counts(cls_rows, min_members=min_industry_members)
+    keep = set(keep_counts)
+    print(f"GICS industries kept (>= {min_industry_members} members): {len(keep)}")
+
+    def load_index_levels(timeframe: str) -> "pandas.DataFrame":
+        rows = spark.sql(
+            f"SELECT UNIX_TIMESTAMP(timestamp) AS ts, symbol, level "
+            f"FROM {_CAP_LEVELS} WHERE timeframe = '{timeframe}' ORDER BY ts"
+        ).collect()
+        recs = [
+            {"ts": int(r["ts"]), "symbol": r["symbol"], "level": float(r["level"])}
+            for r in rows
+        ]
+        if not recs:
+            raise RuntimeError(f"No cap_index_levels for timeframe={timeframe}")
+        df = pd.DataFrame(recs).pivot(index="ts", columns="symbol", values="level")
+        df.columns = [str(c) for c in df.columns]
+        df = df.sort_index()
+        return df[[c for c in df.columns if c in keep]]
+
+    closes_1d = load_index_levels("1D")
+    closes_1w = load_index_levels("1W")
+    print(f"1D industry levels: {closes_1d.shape}")
+    print(f"1W industry levels: {closes_1w.shape}")
+else:
+    closes_1d = load_closes(symbols, "1D")
+    closes_1w = load_closes(symbols, "1W")
+    print(f"1D closes: {closes_1d.shape} ({closes_1d.index.min()}..{closes_1d.index.max()})")
+    print(f"1W closes: {closes_1w.shape} ({closes_1w.index.min()}..{closes_1w.index.max()})")
 
 # COMMAND ----------
 
@@ -215,6 +265,7 @@ if mode == "backfill":
         "daily_window": daily_window,
         "weekly_window": weekly_window,
         "universe": universe,
+        "min_industry_members": min_industry_members,
         "timestamp": daily.index[ends_d].astype("int64"),
         "ar_daily": ar_daily,
     })
