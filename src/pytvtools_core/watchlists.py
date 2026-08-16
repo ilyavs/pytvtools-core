@@ -386,6 +386,22 @@ URANIUM_STRATEGIC = Watchlist(
 )
 
 # ---------------------------------------------------------------------------
+# Recovered US companies (previously cached only under bare, ambiguous names)
+# ---------------------------------------------------------------------------
+# Bare-ticker resolution on TradingView picks foreign namesakes for these, so
+# they were never prefixed into the registry.  These canonical prefixed forms
+# were verified to resolve on a live TradingView chart.
+RECOVERED_US = Watchlist(
+    name="Recovered US (previously bare)",
+    symbols=(
+        "CBOE:CBOE", "NYSE:DAY", "NYSE:FI", "NASDAQ:HOLX", "NASDAQ:WBA",
+        "NASDAQ:MASI", "NYSE:ATUS", "AMEX:GLO", "NYSE:MMC", "NASDAQ:EA",
+        "NYSE:CTRA", "NYSE:BK", "NYSE:BEKE", "NYSE:GPS", "NYSE:IPG",
+        "NYSE:SW", "NASDAQ:SIRI", "NYSE:WBD", "NYSE:XYZ", "NYSE:BALL",
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # Registry — map name → Watchlist for job lookup
 # ---------------------------------------------------------------------------
 
@@ -402,6 +418,7 @@ WATCHLISTS: dict[str, Watchlist] = {
     "BONDS": BONDS,
     "OIL": OIL,
     "URANIUM_STRATEGIC": URANIUM_STRATEGIC,
+    "RECOVERED_US": RECOVERED_US,
 }
 
 PINK_LIST_WATCHLISTS: dict[str, Watchlist] = {
