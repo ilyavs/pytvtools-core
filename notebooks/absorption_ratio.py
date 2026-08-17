@@ -151,8 +151,11 @@ if universe == "GICS":
     print(f"GICS industries kept (>= {min_industry_members} members): {len(keep)}")
 
     def load_index_levels(timeframe: str) -> "pandas.DataFrame":
+        # cap_index_levels.timestamp is ALREADY a BIGINT unix timestamp (written
+        # by cache_industry_indexes), so pass it through directly — applying
+        # UNIX_TIMESTAMP here would reject BIGINT as a non-TIMESTAMP type.
         rows = spark.sql(
-            f"SELECT UNIX_TIMESTAMP(timestamp) AS ts, symbol, level "
+            f"SELECT timestamp AS ts, symbol, level "
             f"FROM {_CAP_LEVELS} WHERE timeframe = '{timeframe}' ORDER BY ts"
         ).collect()
         recs = [
